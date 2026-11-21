@@ -180,8 +180,8 @@ const DND = {
       case 'trans': { const B = this.transTarget(tg); B.trans = { id: pl.id, dur: B.trans && B.trans.dur ? B.trans.dur : 0.7 }; sel = B.id; break; }
       case 'overlay': { const o = withTime(() => addOverlayClip(pl.id, Math.max(0, atTime))); place(o, tg); sel = o.id; break; }
       case 'text':
-        if (c && c.type === 'text') { Object.assign(c.text, styleFull(pl.style)); if (pl.style.size) c.text.size = pl.style.size; }
-        else { const t = withTime(() => addTextClip('Twój tekst', styleFull(pl.style))); place(t, tg); sel = t.id; }
+        if (c && c.type === 'text') { Object.assign(c.text, styleFull(pl.style)); if (pl.style.size) c.text.size = pl.style.size; if (pl.anim) applyTextAnim(c, pl.anim); }
+        else { const t = withTime(() => addTextClip('Twój tekst', styleFull(pl.style))); if (pl.style.size) t.text.size = pl.style.size; if (pl.anim) applyTextAnim(t, pl.anim); place(t, tg); sel = t.id; }
         break;
       case 'sticker': { const t = withTime(() => addStickerClip(pl.emoji)); place(t, tg); sel = t.id; break; }
       case 'shape': { const t = withTime(() => addShapeClip(pl.id)); t.sticker.color = S.shapeColor; place(t, tg); sel = t.id; break; }

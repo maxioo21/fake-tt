@@ -352,7 +352,7 @@ const ANIM_LOOP = {
   wobble: { name: 'Chybotanie', fn: (lt, s, a) => { s.dx += Math.sin(lt * 5) * 0.012 * a; s.r += Math.sin(lt * 5 + 1) * 0.05 * a; } },
 };
 function animState(c, lt, opts = {}) {
-  const st = { dx: 0, dy: 0, s: 1, r: 0, al: 1, bl: 0, fl: 1 };
+  const st = { dx: 0, dy: 0, s: 1, r: 0, al: 1, bl: 0, fl: 1, fy: 1, cl: null };
   const dIn = c.animIn && c.animIn.id !== 'none' ? Math.min(c.animIn.dur, c.dur * 0.6) : 0;
   const dOut = c.animOut && c.animOut.id !== 'none' ? Math.min(c.animOut.dur, c.dur * 0.6) : 0;
   if (!opts.skipIn && dIn > 0 && lt < dIn) { const f = ANIM_IO[c.animIn.id]; if (f && f.fn) f.fn(clamp(lt / dIn, 0, 1), st); }

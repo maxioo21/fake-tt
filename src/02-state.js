@@ -44,7 +44,7 @@ function newClip(type, o = {}) {
   }, o);
 }
 function defText(str = 'Twój tekst') {
-  return { str, font: 'Montserrat', size: 0.085, color: '#ffffff', strokeC: '#000000', strokeW: 0.12, bg: '', bgA: 0.7, shadowC: '#000000', shadowB: 0.12, fill2: '', out2C: '#000000', out2W: 0, hardC: '#000000', hardD: 0, bold: true, italic: false, align: 'center', spacing: 0, lineH: 1.15, upper: false };
+  return { str, font: 'Montserrat', size: 0.085, color: '#ffffff', strokeC: '#000000', strokeW: 0.12, bg: '', bgA: 0.7, shadowC: '#000000', shadowB: 0.12, fill2: '', gradAng: 90, strokeA: 1, out2C: '#000000', out2W: 0, hardC: '#000000', hardD: 0, glowC: '#ffffff', glowB: 0.5, glowA: 0, shA: 1, shD: null, shAng: 90, blur: 0, ul: false, bgR: 0.22, bgP: 0.32, bold: true, italic: false, align: 'center', spacing: 0, lineH: 1.15, upper: false };
 }
 
 const byId = (id) => clips.find((c) => c.id === id);

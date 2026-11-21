@@ -40,8 +40,9 @@ npm run dist                  # instalator w katalogu release/
 **Biblioteka efektów (wszystko własnym kodem)**
 - **67 efektów**: Glitch (blokowy, RGB, datamosh…), Retro (VHS, Retro DV, CCTV, stary film, półton, Polaroid…), Ruch (uderzenie zoom, wstrząsy, kamera z ręki, rozmycie radialne…), Światło (flara, promienie, bokeh, neon…), Kolor (duotone, cyberpunk, noktowizor…).
 - **61 przejść**: zoom-rozmycie, przepalenie taśmy, wyciek światła, błysk, odsłanianie (zegar, serce, romb, szachownica), rozbicie, glitch, przewijanie VHS i inne.
-- **53 filtry**, **38 animacji wejścia/wyjścia** i **27 pętli**.
-- **65 stylów tekstu** w 8 kategoriach (sport/edit, neon, retro, elegancja, zabawa, etykiety, napisy), 32 czcionki, gradient, twardy cień, podwójny obrys, animacje tekstu (maszyna do pisania, litery, słowa, fala, tęcza).
+- **53 filtry**, **82 animacje wejścia/wyjścia** i **53 pętle** (odsłanianie, guma, galaretka, tornado, pieczątka…).
+- **214 stylów tekstu** w 15 kategoriach (szablony z animacją, sport/edit, neon, poświata, rozmyte, gradient, metaliczne, 3D/cień, komiks, retro, elegancja, zabawa, etykiety, napisy) i 32 czcionki. **Ustawienia jak w CapCut:** rozmiar, odstęp liter i wierszy, B/I/U, gradient z kątem, obrys (i drugi obrys), **poświata**, **cień** (kolor, krycie, rozmycie, odległość, kąt) i twardy cień 3D, **rozmycie tekstu**, tło (zaokrąglenie i odstęp). Pola liczbowe obok suwaków.
+- **Animacje tekstu** (16 wejścia/wyjścia, 8 pętli): maszyna z kursorem, szyfr, litery pop/zoom/obrót/przewrót, neon zapala się, glitch liter, rozmycie liter, słowa po kolei i inne.
 - **39 kształtów** wektorowych (strzałki, ramki, celowniki, kreski) i emoji w 12 kategoriach.
 
 **Zakładka „Gotowe” (bez napisów, do edytów)**

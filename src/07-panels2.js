@@ -143,7 +143,7 @@ UI.rLooks = function (box) {
   LOOKS.filter((l) => l.cat === cur).forEach((l) => {
     const fake = newClip('image'); l.apply(fake);
     grid.append(tile(l.name, (x, w, hh, p, tm) => {
-      const sc = sceneCanvases()[0];
+      const sc = sceneFor(w, hh, 0);
       x.drawImage(sc, 0, 0);
       const cv = POOL.get(w, hh), cx = cv.getContext('2d');
       if (HAS_FILTER) cx.filter = cssFilter(fake, hh);
