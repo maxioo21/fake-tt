@@ -170,6 +170,9 @@ const Planner = (() => {
   };
   const verbsIn = (text) => findVerbs(nz(text)).map((v) => (v.act === 'flee' ? 'run' : v.act));
   return { plan, auto, verbsIn, EXAMPLES: [
+    'Zachód słońca nad morzem w stylu anime: fale, mewy i odbicie słońca, 6 sekund',
+    'Logo „KADR” odsłaniane neonem w stylu synthwave z siatką i słońcem',
+    'Pixel-art: rycerz biegnie przez las, 5 sekund',
     'Stwórz animację w stylu Minecraft, gdzie Alex pomacha do Steve’a, ze skinami z gry, około 5 sekund',
     'Odliczanie od 1 do 100 w około 3 sekundy',
     'Pasek ładowania „Wczytywanie gry” przez 5 sekund',
@@ -226,11 +229,13 @@ const AIProv = {
     const L = this.cfg.providers.filter((q) => q.enabled), i = L.indexOf(p); if (i >= 0) this.cfg.cursor = (i + 1) % L.length;
     if (job) job.notes.push({ provider: p.label, stage, at: Date.now(), text: 'przerwano: ' + why }); this.logAdd({ p, stage, r: 'bad', msg: why }); this.save();
   },
+  CODE_RULES: `You write JavaScript that is run in a sandbox (Web Worker + OffscreenCanvas; no DOM, no network, no storage). Define \`function draw(ctx, t, W, H, dur)\` — called for every frame with t in seconds (0..dur) and the canvas size W x H. Design in relative units (e.g. const u = H/100) so any aspect ratio works. draw must be a PURE FUNCTION of t (deterministic: never use Math.random or Date; use rand(seed)). Optionally define \`function setup()\` run once to precompute. The canvas is cleared to black before each frame, so paint a background yourself. Helpers available as globals: PI TAU clamp lerp map fract mod ease easeIn easeOut easeInOut easeOutBack easeOutBounce easeOutElastic hash rand(seed) noise(x) noise2(x,y) rng(seed)->function hsl(h,s,l,a) rgba(r,g,b,a) roundRect(ctx,x,y,w,h,r) star(ctx,cx,cy,r,n,inner) glow(ctx,color,blur) linGrad(ctx,x0,y0,x1,y1,[[0,c],[1,c]]) radGrad(ctx,x,y,r0,r1,stops) text(ctx,str,x,y,size,color,{font,weight,align,stroke,strokeW}) project(x,y,z,{fx,cx,cy,dist}) (for fake 3D). Fonts you may use in text(): Anton, Bebas Neue, Montserrat, Poppins, Orbitron, Righteous, Bangers, Space Grotesk, Playfair Display, Fredoka, Oswald, Manrope. If the first line of the code is "// @gl" then the global gl is a WebGL2 context and draw receives ctx = null. Keep each frame under ~20 ms (at most ~2000 draw calls). Make it look PROFESSIONAL: layered backgrounds, gradients and lighting, easing, secondary motion, a clear composition, readable text, consistent palette. CHOOSE THE VISUAL STYLE THAT FITS THE REQUEST (flat vector, anime/cartoon, pixel art, neon/synthwave, hand-drawn, isometric or fake 3D, painterly gradients, minimal, comic...) and vary palettes and compositions between requests — never fall back to the same look. Characters, animals, vehicles, scenery, logos, UI, charts, particle systems, visualizers and transitions can all be drawn with code.`,
   system() {
     const acts = Anim.ACT_LIST.filter((q) => !['slapped', 'punched', 'kicked', 'pushed', 'hit', 'hugged'].includes(q));
-    return `You are the animation director of a small 2D/3D animation engine. Convert the user's request (any language) into ONE JSON object and nothing else. Think carefully and follow EVERY detail of the request (names, order of actions, style, duration, numbers, texts). First decide "kind":
+    return `You are the animation director of a small 2D/3D animation engine. Convert the user's request (any language) into ONE JSON object and nothing else. Think carefully and follow EVERY detail of the request (names, order of actions, style, duration, numbers, texts). First decide "kind" (prefer "code" for artistic, scenic or unusual requests and whenever a specific art style is requested; "characters" for people acting out a script with the built-in engine; "motion" for counters, titles and simple graphics):
 (A) "characters": people/robots/mobs acting in a scene. Schema: {"kind":"characters","understanding":"one sentence in Polish","assumptions":["..."],"style":"3d"|"2d","bg":${JSON.stringify(Anim.BG_LIST)},"cam":"auto"|"wide"|"close","chars":[{"id":"A","name":"...","type":"human"|"robot","mcSkin":"Minecraft nickname, or steve, or alex, or null","skin":"#rrggbb skin tone","shirt":"#rrggbb","pants":"#rrggbb","hair":"#rrggbb","hs":"short"|"long"|"bun"|"cap"|"none","model":"round"|"block"}],"steps":[{"at":seconds,"dur":seconds,"who":"A","act":${JSON.stringify(acts)},"target":"B"|null,"text":"optional speech"}]}.
 Rules: 1-4 characters with ids A,B,C,D; two characters start ~4.6 m apart facing each other; walking 1.45 m/s, running 3.6 m/s ("approach" from the start takes ~3 s). Different characters' steps may overlap; one character's steps must not. Acts needing a target (approach, slap, punch, kick, push, hug, kiss, throw, point, look, shout, sword) must set "target". Victim reactions are automatic — do NOT add them. For a block-world / voxel-game / Minecraft-like request use "model":"block", a voxel* background, and for Minecraft's Steve/Alex set "mcSkin":"steve"/"alex" (the app downloads the real skin by nickname). Respect the requested total duration: all steps must end about 0.7 s before it. If no listed act fits, invent a NEW move: act "custom", "n":"short name", "dur":seconds, "keys": 3-10 keyframes [{"t":0..1,"lean":rad,"twist":rad,"roll":rad,"hp":rad,"hy":rad,"hr":rad,"rootY":m,"air":m,"bp":rad,"L":[pitch,roll,elbow],"R":[pitch,roll,elbow],"LL":[pitch,roll,knee],"RL":[pitch,roll,knee],"eyes":"open|closed|happy|x","mouth":0..1,"smile":-1..1,"brow":-1..1}] (radians; arm pitch forward +, arm roll outward + (2.5 = overhead), leg pitch forward +, knee flex +, lean forward +, hp + = nod, bp -1.5 = lying on the back).
+(C) "code": ANY visual idea in ANY style that (A) and (B) cannot express well (anime/cartoon scenes, scenery, animals, vehicles, logo reveals, generative art, physics, visualizers, diagrams, special effects...). Schema: {"kind":"code","understanding":"...","assumptions":[],"title":"short title","dur":seconds,"handoff":"...","code":"JavaScript source as a JSON string"}. ${AIProv.CODE_RULES}
 (B) "motion": motion graphics — counters, countdowns, timers, progress/loading bars, titles, quotes, charts, particles, abstract shapes, anything flat 2D. Schema: {"kind":"motion","understanding":"...","assumptions":[],"dur":seconds,"bg":{"type":"gradient","colors":["#hex",...],"angle":deg},"bgfx":[{"type":"stars|bokeh|rays|grid|vignette","count":n,"color":"css"}],"layers":[{"type":"text|rect|circle|line|ring|bar|emoji|poly|particles","at":sec,"dur":sec,"x":0..1,"y":0..1,"opacity":1,"rot":deg,"scale":1,"copies":n,"blend":"lighter"}]}.
 Every numeric property may be a number or an EXPRESSION string evaluated each frame. Variables: t (scene seconds), u (t/dur), lt (seconds since layer start), lu (0..1 over the layer's life), i (copy index), n (copies), f (i/(n-1)), W, H. Functions: sin cos abs min max floor round sqrt pow lerp(a,b,k) clamp(v,a,b) map(v,a,b,c,d) fract mod ease easeIn easeOut easeInOut easeOutBack easeOutBounce easeOutElastic rand(seed) noise(x) hsl(h,s,l) pad(n,len) fmt(n) pct(v) time(sec) timecc(sec) typed(str,k) upper. Operators + - * / % ** < > <= >= == != && || ?: . Text uses {expression} templates, e.g. "{round(lerp(1,100,lu))}". Colors can be an expression when prefixed with "=", e.g. "=hsl(lt*90,90,60)". Layer props: text{text,size(fraction of height),color,font,weight,glow,glowColor,stroke{w,color},spacing,align}; rect{w,h,radius,color,color2}; circle{r,color,fill,stroke{w,color}}; line{x2,y2,width}; ring{r,width,value,trackColor}; bar{w,h,value,trackColor,radius}; emoji{char,size}; poly{points:[[x,y],...] in height units relative to the center,closed}; particles{count,life,speed,gravity,size,shape:circle|square|star,direction:up|down|burst|out,spreadX,spreadY,colors:[...]}. Positions are fractions of the frame (0..1). Fonts: ${Motion.FONTS.join(', ')}. Make it polished: easing, glow, secondary elements.
 Also add a top-level "handoff": one short sentence in Polish telling a colleague AI what you decided and what remains to be checked (it is shown to the next assistant if you stop). Output valid JSON only.`;
@@ -312,13 +317,26 @@ Also add a top-level "handoff": one short sentence in Polish telling a colleague
     throw last || new Error('AI nie odpowiedziało');
   },
   async test(p) { try { const out = await this.callOne(p, 'Return exactly this JSON: {"ok":true}', 'Reply with JSON only.'); return { ok: /ok/.test(String(out)), msg: String(out).slice(0, 60) }; } catch (e) { const c = this.classify(e); return { ok: false, msg: c.why + ' — ' + String(e.message).slice(0, 100) }; } },
+  parseJSON(out) { const m = /\{[\s\S]*\}/.exec(String(out || '')); if (!m) throw new Error('odpowiedź nie jest JSON-em'); try { return JSON.parse(m[0]); } catch (e) { throw new Error('niepoprawny JSON: ' + e.message.slice(0, 80)); } },
+  buildScene(o, text) {
+    if (o && (o.kind === 'code' || typeof o.code === 'string')) { const code = String(o.code || '').slice(0, 80000); if (!/function\s+draw\s*\(|\bdraw\s*=\s*(function|\()/.test(code)) throw new Error('AI nie zwróciło funkcji draw()'); return { kind: 'code', code, dur: Math.max(1, Math.min(60, +o.dur || 5)), title: String(o.title || '').slice(0, 80), prompt: text }; }
+    if (o && (o.kind === 'motion' || (!o.chars && o.layers))) { const sc = Motion.sanitize(o); if (!sc) throw new Error('AI zwróciło pustą grafikę'); sc.prompt = text; return sc; }
+    const sc = Anim.sanitize(o); if (!sc || !sc.steps.length) throw new Error('AI nie zaplanowało żadnych czynności'); sc.prompt = text; return sc;
+  },
+  /* wywołanie AI na istniejącym kodzie: naprawa błędu albo poprawka użytkownika */
+  async codeCall(sc, instruction, stage) {
+    const job = this.lastJob || this.newJob(sc.prompt), user = 'USER REQUEST:\n' + sc.prompt + '\n\nCURRENT CODE:\n' + sc.code + '\n\n' + instruction;
+    for (let t = 0; t < 3; t++) {
+      const out = await this.complete(user, this.codeSystem(), { job, stage }), prov = this.lastProv;
+      try { const o = this.parseJSON(out), n = this.buildScene(Object.assign({ kind: 'code' }, o), sc.prompt); job.notes.push({ provider: prov.label, stage, at: Date.now(), text: String(o.handoff || 'poprawiłem kod').slice(0, 200) }); this.save(); return n; }
+      catch (e) { this.penalize(prov, 'niepoprawna odpowiedź (' + e.message + ')', stage, job); }
+    }
+    throw new Error('żadne AI nie zwróciło poprawionego kodu');
+  },
+  codeSystem() { return 'You are a senior creative coder. ' + this.CODE_RULES + ' You receive the user request, the current code and either an ERROR from the sandbox or a MODIFICATION request. Return ONE JSON object {"kind":"code","title":"...","dur":seconds,"handoff":"one short sentence in Polish","code":"the COMPLETE corrected JavaScript"} and nothing else. Keep the style and everything that was not asked to change.'; },
   async plan(text) {
-    const parse = (out) => { const m = /\{[\s\S]*\}/.exec(String(out || '')); if (!m) throw new Error('odpowiedź nie jest JSON-em'); return JSON.parse(m[0]); };
-    const build = (o) => {
-      if (o && (o.kind === 'motion' || (!o.chars && o.layers))) { const sc = Motion.sanitize(o); if (!sc) throw new Error('AI zwróciło pustą grafikę'); sc.prompt = text; return sc; }
-      const sc = Anim.sanitize(o); if (!sc || !sc.steps.length) throw new Error('AI nie zaplanowało żadnych czynności'); sc.prompt = text; return sc;
-    };
-    const job = this.newJob(text);
+    const parse = (o) => this.parseJSON(o), build = (o) => this.buildScene(o, text);
+    const job = this.newJob(text); this.lastJob = job;
     const ask = async (msg, sys, stage) => {
       for (let t = 0; t < 4; t++) {
         const out = await this.complete(msg, sys, { job, stage }), prov = this.lastProv;
@@ -401,6 +419,7 @@ UI.renderPanel = function (keepScroll) {
 /* opis zrozumiałego dla człowieka podsumowania sceny */
 function describeScene(sc) {
   const out = [];
+  if (sc.kind === 'code') { out.push(`Rodzaj: animacja napisana przez AI jako kod (dowolny styl) · ${sc.dur.toFixed(1)} s${sc.title ? ' · „' + sc.title + '”' : ''}`); return out; }
   if (sc.kind === 'motion') { out.push(`Rodzaj: grafika ruchoma · ${sc.dur.toFixed(1)} s · ${sc.layers.length} warstw.`); sc.layers.filter((l) => l.type === 'text').slice(0, 3).forEach((l) => out.push('Tekst: ' + String(l.text).slice(0, 70))); return out; }
   out.push('Postacie: ' + sc.chars.map((c) => c.name + (c.model === 'block' ? ' (klockowa' + (c.skinName ? ', skin ' + c.skinName : c.skinTex ? ', własny skin' : '') + ')' : '')).join(', '));
   out.push(`Styl: ${sc.style.toUpperCase()} · tło: ${(Anim.BGS[sc.bg] || {}).n} · kamera: ${{ auto: 'automatyczna', wide: 'szeroka', close: 'z bliska' }[sc.cam] || sc.cam}`);
@@ -426,32 +445,21 @@ async function preloadScene(sc) {
 }
 /* renderuje scenę do prawdziwego pliku wideo (MP4/WebM) — można go potem montować jak każde wideo */
 async function renderSceneVideo(scene, cb) {
-  if (!(window.VideoEncoder && window.VideoFrame)) throw new Error('ta przeglądarka nie koduje wideo (użyj aplikacji desktopowej, Chrome lub Edge)');
   await preloadScene(scene);
-  const [W, H] = canvasSize(P.aspect, 720), fps = 30, dur = Anim.duration(scene), info = await Exporter.pickCodecs(W, H, fps, Exporter.bitrate(W, H, fps, 1), false);
-  if (info.fail) throw new Error(info.label);
-  const vopt = { codec: info.video.mux, width: W, height: H, frameRate: fps }, cont = info.video.container;
-  const muxer = cont === 'mp4' ? new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: vopt, fastStart: 'in-memory', firstTimestampBehavior: 'offset' }) : new WebMMuxer.Muxer({ target: new WebMMuxer.ArrayBufferTarget(), video: vopt, firstTimestampBehavior: 'offset' });
-  let err = null; const enc = new VideoEncoder({ output: (c, m) => muxer.addVideoChunk(c, m), error: (e) => { err = e; } }); enc.configure(info.video.cfg);
-  const cv = mkCanvas(W, H), x = cv.getContext('2d'), total = Math.max(1, Math.ceil(dur * fps));
-  for (let i = 0; i < total; i++) {
-    if (err) throw err; Anim.draw(x, W, H, scene, i / fps);
-    const vf = new VideoFrame(cv, { timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) }); enc.encode(vf, { keyFrame: i % (fps * 2) === 0 }); vf.close();
-    while (enc.encodeQueueSize > 8) await sleep(4);
-    if (i % 6 === 0) { if (cb) cb(i / total); await sleep(0); }
-  }
-  await enc.flush(); if (err) throw err; muxer.finalize();
-  return { blob: new Blob([muxer.target.buffer], { type: cont === 'mp4' ? 'video/mp4' : 'video/webm' }), container: cont, w: W, h: H };
+  const [W, H] = canvasSize(P.aspect, 720), fps = 30, dur = Anim.duration(scene), cv = mkCanvas(W, H), x = cv.getContext('2d');
+  return encodeFrames(W, H, fps, Math.max(1, Math.ceil(dur * fps)), async (i) => { Anim.draw(x, W, H, scene, i / fps); return cv; }, cb);
 }
 UI.aiGenerate = async function (variant) {
   const st = this._ai, text = st.text.trim(); AIProv.onStatus = (t) => { const el = document.getElementById('aistatus'); if (el) el.textContent = t; };
   if (!text) { toast('Opisz najpierw, co mam zrobić'); return; }
   const prev = st.scene; st.busy = true; st.notes = []; st.report = null; if (!variant) { st.variantN = 0; st.scene = null; } this.renderPanel(true);
-  let scene = null, base = variant && st.base ? st.base : null;
+  let scene = null, base = variant && st.base && st.base.kind !== 'code' ? st.base : null;
+  const codeVariant = variant && st.base && st.base.kind === 'code';
   if (!base) {
-    if (AIProv.cfg.provider !== 'local') { try { scene = await AIProv.plan(text); st.notes.push(`Scenariusz ułożyło zewnętrzne AI${scene.reviewed ? ' (po sprawdzeniu i poprawce)' : ''}.`, ...(scene.aiLog || []).map((x) => 'Przebieg pracy AI: ' + x)); } catch (e) { st.notes.push('AI nie odpowiedziało (' + e.message + ') — użyłem lokalnego planera.'); } }
-    if (!scene) { const r = Planner.auto(text); scene = r.scene; st.notes.push(...r.notes); st.report = r.report; }
-    if (scene.kind !== 'motion') {
+    if (AIProv.cfg.provider !== 'local') { try { scene = await AIProv.plan(text + (codeVariant ? '\n(Make a clearly DIFFERENT version than before: different art style, palette, composition and motion.)' : '')); st.notes.push(`Scenariusz ułożyło zewnętrzne AI${scene.reviewed ? ' (po sprawdzeniu i poprawce)' : ''}.`, ...(scene.aiLog || []).map((x) => 'Przebieg pracy AI: ' + x)); } catch (e) { st.notes.push('AI nie odpowiedziało (' + e.message + ') — użyłem lokalnego planera.'); } }
+    if (!scene) { const r = Planner.auto(text); scene = r.scene; st.notes.push(...r.notes); st.report = r.report; if (AIProv.cfg.provider === 'local' && r.notes.some((q) => /Nie rozpoznałem żadnej czynności/.test(q))) st.notes.push('Ten opis wymaga prawdziwego AI: lokalny planer zna tylko postacie, liczniki, stopery, tytuły i paski. Dodaj darmowe AI w AI → Ustawienia AI (np. Gemini), a zrobi to w dowolnym stylu — AI samo napisze kod animacji.'); }
+    if (scene.kind === 'code') { try { await UI.aiRunCode(scene, st); } catch (e) { st.notes.push('Nie udało się wygenerować animacji z kodu: ' + e.message); st.busy = false; st.scene = scene.video ? scene : null; this.renderPanel(true); return; } }
+    else if (scene.kind !== 'motion') {
       const have = new Set(scene.steps.map((q) => q.act)); const miss = [...new Set(Planner.verbsIn(text))].filter((a) => !have.has(a) && !(a === 'approach' && have.has('runto')));
       if (miss.length && AIProv.cfg.provider !== 'local') st.notes.push('Uwaga: w opisie widzę czynności (' + miss.map((a) => (Anim.ACTS[a] || {}).n || a).join(', ') + '), których nie ma w scenariuszu — sprawdź listę kroków.');
       if (st.style !== 'auto') scene.style = st.style; if (st.bg !== 'auto') scene.bg = st.bg; if (st.cam !== 'auto') scene.cam = st.cam; if (st.model !== 'auto') scene.chars.forEach((c) => { c.model = st.model; });
@@ -460,10 +468,51 @@ UI.aiGenerate = async function (variant) {
     if (st.target > 0) scene.target = st.target;
     scene.prompt = text; st.base = scene;
   } else scene = base;
-  if (variant) { st.variantN = (st.variantN || 0) + 1; scene = variantOf(st.base, st.variantN); st.notes.push('Inna wersja #' + st.variantN + ': zmieniona kamera/tło/kolory — treść ta sama.'); }
+  if (variant && !codeVariant) { st.variantN = (st.variantN || 0) + 1; scene = variantOf(st.base, st.variantN); st.notes.push('Inna wersja #' + st.variantN + ': zmieniona kamera/tło/kolory — treść ta sama.'); }
   if (scene.kind === 'motion' && st.target > 0) { scene.dur = st.target; }
-  try { await preloadScene(scene); } catch (e) { /* ok */ }
+  try { if (scene.kind !== 'code') await preloadScene(scene); } catch (e) { /* ok */ }
+  if (st.scene && st.scene !== scene && st.scene.video) { try { URL.revokeObjectURL(st.scene.video.url); } catch (e) { /* ok */ } }
   st.scene = scene; st.busy = false; this.renderPanel(true); void prev;
+};
+/* uruchamia kod z AI w piaskownicy; błędy wracają do AI (pętla naprawy), aż animacja się wyrenderuje */
+UI.aiRunCode = async function (sc, st, maxTries = 4) {
+  const [W, H] = canvasSize(P.aspect, 720), say = (t) => { AIProv.status(t); };
+  let lastErr = null;
+  for (let attempt = 1; attempt <= maxTries; attempt++) {
+    say('Uruchamiam animację w piaskownicy' + (attempt > 1 ? ` (próba ${attempt}/${maxTries})` : '') + '…');
+    try {
+      const r = await CodeAnim.toVideo(sc.code, { W, H, fps: 30, dur: sc.dur, cb: (p) => say('Renderuję klatki… ' + Math.round(p * 100) + '%') });
+      if (sc.video) { try { URL.revokeObjectURL(sc.video.url); } catch (e) { /* ok */ } }
+      sc.video = Object.assign(r, { url: URL.createObjectURL(r.blob) }); sc.runs = (sc.runs || 0) + 1;
+      if (attempt > 1) st.notes.push(`Kod działał po ${attempt - 1} poprawce/ach wprowadzonych przez AI.`);
+      return sc;
+    } catch (e) {
+      lastErr = e; st.notes.push(`Próba ${attempt}: ${e.message}`);
+      if (attempt >= maxTries || AIProv.cfg.provider === 'local') break;
+      say('Błąd w kodzie — AI poprawia (' + attempt + '/' + (maxTries - 1) + ')…');
+      const fixed = await AIProv.codeCall(sc, 'The code failed in the sandbox with this ERROR (fix the root cause and return the complete corrected code):\n' + e.message, 'naprawa');
+      sc.code = fixed.code; if (fixed.dur) sc.dur = fixed.dur;
+    }
+  }
+  throw lastErr || new Error('nieznany błąd');
+};
+async function codeToMontage(sc) {
+  const v = sc.video, name = 'Animacja AI ' + String(sc.title || sc.prompt || '').replace(/[^\w\- ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, '').slice(0, 26).trim() + '.' + v.container, m = await importFile(new File([v.blob], name, { type: v.blob.type }));
+  if (m) { App.addMedia(m); toast('Wideo dodane do montażu (Media + oś czasu).'); }
+}
+/* karta wyniku „animacja z kodu napisanego przez AI” */
+UI.aiCodeCard = function (box, sc, st) {
+  const v = sc.video, status = (t) => { const el = document.getElementById('aistatus'); if (el) el.textContent = t; };
+  box.append(h('div', { class: 'card2' }, h('h5', {}, 'Zrozumiałem'), h('ul', { class: 'steps' }, [...describeScene(sc), ...(sc.understanding ? ['AI: ' + sc.understanding] : []), ...((sc.assumptions || []).map((q) => 'Założenie: ' + q))].map((q) => h('li', {}, q)))));
+  const vid = h('video', { src: v.url, controls: true, loop: true, autoplay: true, muted: true, playsinline: true, class: 'aiprev', style: `aspect-ratio:${v.w}/${v.h}` });
+  const ta = h('textarea', { class: 'txt code', rows: 10, spellcheck: 'false' }, sc.code), rev = h('input', { type: 'text', class: 'txt', placeholder: 'Co poprawić? np. „zmień niebo na fioletowe i dodaj gwiazdy”' });
+  const run = async (fn) => { if (st.busy) return; st.busy = true; AIProv.onStatus = status; this.renderPanel(true); try { await fn(); } catch (e) { st.notes.push('Nie udało się: ' + e.message); } st.busy = false; this.renderPanel(true); };
+  box.append(h('div', { class: 'card2' }, h('h5', {}, 'Podgląd wideo (' + sc.dur.toFixed(1) + ' s, ' + (sc.runs || 1) + '× uruchomiono)'), vid,
+    h('div', { class: 'row2' }, F.btn('Dodaj do montażu', () => codeToMontage(sc), 'primary', 'plus'), F.btn('Inna wersja', () => { if (!st.busy) this.aiGenerate(true); }, '', 'repeat')),
+    h('div', { class: 'nickrow' }, rev, F.btn('Popraw', () => { const t = rev.value.trim(); if (!t) { toast('Napisz, co poprawić'); return; } if (AIProv.cfg.provider === 'local') { toast('Poprawki wymagają podłączonego AI (AI → Ustawienia AI)'); return; }
+      run(async () => { const n = await AIProv.codeCall(sc, 'MODIFICATION REQUEST FROM THE USER (apply it, keep everything else):\n' + t, 'poprawka'); sc.code = n.code; if (n.dur) sc.dur = n.dur; await UI.aiRunCode(sc, st); st.notes.push('Zastosowano poprawkę: ' + t); }); }, 'sm', 'wand')),
+    F.btn('Zapisz plik wideo na dysk', async () => { const nm = 'Animacja-AI.' + v.container; if (await saveFile(nm, v.blob)) toast('Zapisano ' + nm); }, 'sm', 'download'),
+    h('details', { class: 'ailog' }, h('summary', {}, 'Kod animacji (możesz go edytować)'), ta, F.btn('Uruchom ten kod', () => run(async () => { sc.code = ta.value; await UI.aiRunCode(sc, st, 1); }), 'sm', 'play'))));
 };
 UI.aiPreview = function (cv, scene) {
   const t0 = performance.now(), dur = Anim.duration(scene) + 0.6, x = cv.getContext('2d');
@@ -474,7 +523,7 @@ UI.pAI = function (box) {
   const st = this._ai, A = AIProv.cfg;
   box.append(h('div', { class: 'p-head' }, h('h3', {}, 'AI Studio'), h('span', { class: 'badge' }, 'NOWE')));
   box.append(h('div', { class: 'card2' }, h('h5', {}, 'Animator scen 2D / 3D'),
-    F.hint('Opisz scenę po polsku — np. „pierwsza postać podchodzi do drugiej i uderza ją z liścia”. Własny silnik narysuje animację 2D lub 3D z kamerą, efektami i tłem. Działa lokalnie i za darmo: bez Claude, bez kredytów.'),
+    F.hint('Opisz, co chcesz zobaczyć — w dowolnym stylu. Bez AI wbudowany silnik zrobi postacie (też klockowe, ze skinami), liczniki, stopery i tytuły. Z podłączonym AI (Ustawienia AI) to AI samo pisze kod animacji w dowolnym stylu (anime, pixel-art, neon, krajobrazy, logo, wizualizacje…), uruchamia go w bezpiecznej piaskownicy, poprawia własne błędy i oddaje gotowe wideo do montażu.'),
     h('p', { class: 'hint' }, 'Planer: ' + (A.provider === 'multi' ? 'zewnętrzne AI z listy (' + A.providers.filter((q) => q.enabled).map((q) => q.label).join(' → ') + '), z automatycznym przełączaniem po wyczerpaniu limitu' : 'lokalny, bez AI, za darmo') + '. Kilka darmowych AI włączysz niżej w ustawieniach — wtedy planują swobodniej i dokładniej.'),
     h('textarea', { class: 'txt', rows: 4, placeholder: 'Opisz scenę… np. Dziewczyna płacze, a chłopak podchodzi i ją przytula', oninput: (e) => { st.text = e.target.value; } }, st.text),
     h('div', { class: 'chips ex' }, Planner.EXAMPLES.map((e) => h('button', { class: 'chip', onclick: () => { st.text = e; this.renderPanel(true); } }, e.length > 44 ? e.slice(0, 42) + '…' : e))),
@@ -485,7 +534,8 @@ UI.pAI = function (box) {
     F.seg('Postacie', [['auto', 'Auto'], ['round', 'Okrągłe'], ['block', 'Klockowe']], () => st.model, (v) => { st.model = v; setTimeout(() => this.renderPanel(true), 0); }),
     F.btn(st.busy ? 'Układam scenariusz…' : 'Generuj animację', () => { if (!st.busy) this.aiGenerate(); }, 'primary block', 'sparkles'), h('p', { id: 'aistatus', class: 'hint' }, st.busy ? (AIProv.cur || '') : '')));
   if (st.notes.length) box.append(h('div', { class: 'note' }, st.notes.map((n) => h('div', {}, n))));
-  if (st.scene) {
+  if (st.scene && st.scene.kind === 'code') this.aiCodeCard(box, st.scene, st);
+  else if (st.scene) {
     const sc = st.scene, asp = (ASPECTS[P.aspect] || [16, 9]), W = 320, Hh = Math.round(W * asp[1] / asp[0]);
     const cv = h('canvas', { class: 'aiprev', width: W * 2, height: Hh * 2, style: `aspect-ratio:${asp[0]}/${asp[1]}` });
     const lst = sc.kind === 'motion' ? h('ol', { class: 'steps' }, sc.layers.slice(0, 12).map((l) => h('li', {}, h('b', {}, { text: 'Tekst', rect: 'Prostokąt', circle: 'Koło', line: 'Linia', ring: 'Pierścień', bar: 'Pasek', emoji: 'Emoji', poly: 'Wielokąt', particles: 'Cząsteczki' }[l.type] || l.type), l.type === 'text' ? ' „' + String(l.text).slice(0, 40) + '”' : '')))
