@@ -3,7 +3,8 @@
    Kadr Studio — oś czasu
    ============================================================ */
 const TL = {
-  LANE_H: { v3: 36, v2: 36, v1: 54, a1: 40, a2: 40 },
+  LANE_H: { v1: 54, a1: 40, a2: 40 }, NEW_H: 15,
+  laneH(id) { return this.LANE_H[id] || (String(id)[0] === 'a' ? 40 : 36); },
   scroll: null, content: null, ruler: null, head: null, lanesBox: null, labels: null, drag: null, lanes: {},
 
   init() {
@@ -23,7 +24,7 @@ const TL = {
       tb('freeze', 'Zatrzymaj klatkę', () => Act.freeze(), 'bFreeze'),
       tb('flag', 'Dodaj znacznik (M)', () => Act.marker(), 'bMarker'),
       tb('magnet', 'Przyciąganie do krawędzi i znaczników', () => { S.snap = !S.snap; this.syncBar(); }, 'bSnap'),
-      tb('link', 'Magnetyczna ścieżka główna (bez luk, jak w CapCut)', () => { S.magnet = !S.magnet; if (S.magnet) commit(); this.syncBar(); toast(S.magnet ? 'Ścieżka główna: klipy stykają się bez luk' : 'Ścieżka główna: swobodne ułożenie klipów'); }, 'bMag'),
+      tb('link', 'Magnetyczna ścieżka główna: włączona = klipy zawsze się stykają; wyłączona = zostają tam, gdzie je zostawisz (domyślnie)', () => { S.magnet = !S.magnet; if (S.magnet) commit(); this.syncBar(); toast(S.magnet ? 'Ścieżka główna: klipy stykają się bez luk' : 'Ścieżka główna: swobodne ułożenie klipów'); }, 'bMag'),
       h('span', { class: 'grow' }),
       tb('zoomOut', 'Oddal oś (−)', () => this.setZoom(S.zoom / 1.35)),
       h('input', { type: 'range', id: 'zoomRange', min: '0', max: '100', value: '50', 'aria-label': 'Powiększenie osi czasu', oninput: (e) => this.setZoom(Math.exp(lerp(Math.log(12), Math.log(500), e.target.value / 100)), true) }),
@@ -41,15 +42,7 @@ const TL = {
     this.content.append(this.ruler, this.lanesBox, this.head);
     /* etykiety ścieżek */
     this.labels.append(h('div', { class: 'lbl-ruler' }));
-    this.lblEls = {};
-    LANES.forEach((l) => { const el = h('div', { class: 'lbl ' + l.kind, style: `height:${this.LANE_H[l.id]}px`, title: l.label }); this.lblEls[l.id] = el; this.labels.append(el); });
-    LANES.forEach((l) => {
-      const el = h('div', { class: 'lane ' + l.kind, 'data-lane': l.id, style: `height:${this.LANE_H[l.id]}px` });
-      el.addEventListener('dragover', (e) => { if ([...e.dataTransfer.types].includes('text/kadr-media')) { e.preventDefault(); el.classList.add('drop'); } });
-      el.addEventListener('dragleave', () => el.classList.remove('drop'));
-      el.addEventListener('drop', (e) => this.onDrop(e, l));
-      this.lanes[l.id] = el; this.lanesBox.append(el);
-    });
+    this.built = false; this.buildLanes();
     /* wskaźnik / przewijanie / przeciąganie */
     this.scroll.addEventListener('pointerdown', (e) => this.onDown(e));
     window.addEventListener('pointermove', (e) => this.onMove(e));
@@ -66,6 +59,34 @@ const TL = {
     this.setZoom(S.zoom, false, true);
   },
 
+  /* (prze)budowuje paski ścieżek i etykiety; na krawędziach są paski „+ nowa ścieżka” */
+  buildLanes() {
+    this.labels.innerHTML = ''; this.lanesBox.innerHTML = ''; this.lblEls = {}; this.lanes = {}; this.laneDefs = [];
+    this.labels.append(h('div', { class: 'lbl-ruler' }));
+    const strip = (kind) => {
+      const id = 'new:' + kind, txt = kind === 'v' ? '+ nowa ścieżka obrazu' : '+ nowa ścieżka audio';
+      this.labels.append(h('div', { class: 'lbl newlbl', style: `height:${this.NEW_H}px` }));
+      const el = h('div', { class: 'lane newlane ' + kind, 'data-lane': id, style: `height:${this.NEW_H}px`, title: kind === 'v' ? 'Upuść tutaj klip, aby powstała nowa ścieżka obrazu (nakładka)' : 'Upuść tutaj klip audio, aby powstała nowa ścieżka audio' }, h('span', { class: 'newtxt' }, txt));
+      const l = { id, kind, isNew: true };
+      el.addEventListener('dragover', (e) => { if ([...e.dataTransfer.types].includes('text/kadr-media')) { e.preventDefault(); el.classList.add('drop'); } });
+      el.addEventListener('dragleave', () => el.classList.remove('drop'));
+      el.addEventListener('drop', (e) => this.onDrop(e, l));
+      this.lanes[id] = el; this.lanesBox.append(el); this.laneDefs.push(l);
+    };
+    const mkLane = (l) => {
+      const lb = h('div', { class: 'lbl ' + l.kind, style: `height:${this.laneH(l.id)}px`, title: l.label }); this.lblEls[l.id] = lb; this.labels.append(lb);
+      const el = h('div', { class: 'lane ' + l.kind, 'data-lane': l.id, style: `height:${this.laneH(l.id)}px` });
+      el.addEventListener('dragover', (e) => { if ([...e.dataTransfer.types].includes('text/kadr-media')) { e.preventDefault(); el.classList.add('drop'); } });
+      el.addEventListener('dragleave', () => el.classList.remove('drop'));
+      el.addEventListener('drop', (e) => this.onDrop(e, l));
+      this.lanes[l.id] = el; this.lanesBox.append(el); this.laneDefs.push(l);
+    };
+    const vs = LANES.filter((l) => l.kind === 'v'), as = LANES.filter((l) => l.kind === 'a');
+    if (vs.length < MAX_V) strip('v');
+    vs.forEach(mkLane); as.forEach(mkLane);
+    if (as.length < MAX_A) strip('a');
+    this.built = true;
+  },
   renderLabels() {
     LANES.forEach((l) => {
       const el = this.lblEls[l.id]; el.innerHTML = '';
@@ -113,14 +134,15 @@ const TL = {
 
   /* ---------- rysowanie ---------- */
   render() {
+    syncLanes(); { const sig = LANES.map((l) => l.id).join(); if (sig !== this.sig || !this.built) { this.buildLanes(); this.sig = sig; } }
     const dur = projectDuration();
     const vw = this.scroll.clientWidth || 600;
     const total = Math.max(dur + Math.max(8, vw / S.zoom * 0.5), vw / S.zoom);
     const W = Math.ceil(total * S.zoom);
     this.content.style.width = W + 'px';
     this.renderRuler(total);
-    LANES.forEach((l) => {
-      const el = this.lanes[l.id]; el.innerHTML = '';
+    Object.keys(this.lanes).forEach((id) => {
+      const el = this.lanes[id]; if (!el.classList.contains('newlane')) el.innerHTML = '';
       el.style.width = W + 'px';
     });
     /* znaczniki */
@@ -224,7 +246,7 @@ const TL = {
   /* ---------- interakcje ---------- */
   timeAt(clientX) { const r = this.content.getBoundingClientRect(); return Math.max(0, (clientX - r.left) / S.zoom); },
   laneAt(clientY) {
-    for (const l of LANES) { const r = this.lanes[l.id].getBoundingClientRect(); if (clientY >= r.top && clientY < r.bottom) return l; }
+    for (const l of this.laneDefs) { const r = this.lanes[l.id].getBoundingClientRect(); if (clientY >= r.top && clientY < r.bottom) return l; }
     return null;
   },
   snapPts(excl) {
@@ -316,6 +338,7 @@ const TL = {
     const c = d.c;
     if (d.moved) {
       if (d.mode === 'move') {
+        if (String(d.lane).startsWith('new:')) d.lane = ensureLane(d.lane);
         if (S.magnet && d.lane === 'v1') { c.lane = 'v1'; c.start = d.start; packMain(true); }
         else { c.start = resolveStart(c, d.lane, d.start); c.lane = d.lane; }
       } else if (d.mode === 'trimL' || d.mode === 'trimR') {
@@ -329,8 +352,9 @@ const TL = {
     this.lanes[l.id].classList.remove('drop');
     const id = e.dataTransfer.getData('text/kadr-media'); const m = media.get(id); if (!m) return;
     let lane = l.id;
-    if (m.kind === 'audio' && l.kind !== 'a') lane = 'a1';
-    if (m.kind !== 'audio' && l.kind !== 'v') lane = 'v1';
+    if (l.isNew) lane = ensureLane('new:' + (m.kind === 'audio' ? 'a' : 'v'));
+    else if (m.kind === 'audio' && l.kind !== 'a') lane = 'a1';
+    else if (m.kind !== 'audio' && l.kind !== 'v') lane = 'v1';
     addMediaClip(m, { lane, start: this.timeAt(e.clientX) });
     commit(); Engine.setupRenderer();
   },

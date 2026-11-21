@@ -378,3 +378,16 @@ select.mini { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line
 
 textarea.txt.code { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11.5px; line-height: 1.45; }
 .skinrow { display: flex; flex-direction: column; gap: 6px; } .nickrow { display: flex; gap: 6px; } .nickrow .txt { flex: 1; min-width: 0; padding: 6px 9px; }
+
+/* paski „+ nowa ścieżka” */
+.lane.newlane { border: 1px dashed var(--line2); border-radius: 5px; margin: 0; background: transparent; opacity: .5; overflow: hidden; border-bottom-style: dashed; }
+.lane.newlane .newtxt { position: sticky; left: 8px; display: inline-block; padding-left: 8px; font-size: 9.5px; line-height: 13px; color: var(--dim); font-weight: 700; letter-spacing: .02em; pointer-events: none; white-space: nowrap; }
+.lane.newlane.drop, .lane.newlane.dnd-over { opacity: 1; background: var(--accsoft); border-color: var(--acc); }
+.lane.newlane.drop .newtxt, .lane.newlane.dnd-over .newtxt { color: var(--acc2); }
+.lbl.newlbl { border-bottom: 0; }
+
+.prov { display: flex; flex-direction: column; gap: 7px; padding: 9px 10px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); border-left: 3px solid var(--line2); }
+.prov.ok { border-left-color: var(--good); } .prov.cool { border-left-color: #ffb454; } .prov.err { border-left-color: var(--bad); } .prov.off { opacity: .6; }
+.prov .ph { display: flex; align-items: center; justify-content: space-between; gap: 6px; } .prov .phb { display: flex; gap: 2px; }
+.prov .pst { font-size: 11.5px; color: var(--dim); line-height: 1.4; }
+.ailog summary { cursor: pointer; color: var(--mut); font-size: 12px; font-weight: 700; } .ailog .job { margin-top: 6px; }

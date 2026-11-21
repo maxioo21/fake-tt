@@ -312,7 +312,7 @@ class Renderer {
   }
   /* plan klatki: co rysujemy na każdej ścieżce w czasie t */
   plan(t) {
-    const out = [];
+    const out = []; syncLanes();
     for (const lane of VIS_ORDER) {
       if (P.lanes && P.lanes.hidden && P.lanes.hidden[lane]) continue;
       const lc = clips.filter((c) => c.lane === lane && isVisual(c)).sort((a, b) => a.start - b.start);

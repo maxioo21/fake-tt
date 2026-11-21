@@ -60,6 +60,7 @@ npm run dist                  # instalator w katalogu release/
 - **Dokładność:** po wygenerowaniu widzisz kartę „Zrozumiałem” (postacie, skiny, styl, czas, kroki), a przy zewnętrznym AI scenariusz jest dodatkowo sprawdzany i poprawiany w drugim zapytaniu. Można podać docelową długość (np. „około 5 sek” albo pole „Docelowa długość”) — czynności powtarzalne rozciągają się, by ją wypełnić.
 - **Grafika ruchoma (nie tylko postacie):** odliczanie i liczniki („od 1 do 100 w 3 sekundy”), stoper/minutnik, paski ładowania, tytuły z animacją i konfetti, fajerwerki, śnieg… Własny, bezpieczny silnik wyrażeń (zależnych od czasu) pozwala AI zbudować dowolną płaską kompozycję: tekst, kształty, pierścienie, paski, cząsteczki, kopie z indeksem, easing. Edytujesz ją w „Edytuj → Scena” (teksty, kolory, tło, JSON).
 - **Inna wersja** naprawdę zmienia kamerę, tło, styl lub kolory; **„Zrób z tego wideo i dodaj do montażu”** renderuje prawdziwy plik MP4/WebM (też do zapisania na dysk), który montujesz jak każde wideo.
+- **Kilka darmowych AI naraz, z automatycznym przełączaniem:** w AI → Ustawienia AI dodajesz listę (Gemini, Groq, OpenRouter, Cerebras, Mistral, ChatGPT/OpenAI, Ollama, własne API). Gdy jedno wyczerpie limit (429, brak środków, błąd), aplikacja przechodzi na następne, a po odnowieniu limitu wraca — w kółko. Każde AI zapisuje notatkę „co zrobiłem i co zostało”, którą czyta kolejne i kontynuuje to samo zadanie. Widzisz stan każdego (gotowe / przerwa do HH:MM), na żywo „kto teraz pracuje” oraz dziennik i notatki. Do ChatGPT potrzebny jest klucz API (sam abonament nie wystarczy).
 - **Obraz AI** (Pollinations, bezpłatnie, wymaga internetu): generuje obraz z opisu i dodaje go do biblioteki.
 - Asystent napisów/haszatagów może korzystać z tego samego podłączonego AI zamiast Claude.
 
@@ -71,6 +72,11 @@ npm run dist                  # instalator w katalogu release/
 - **Montaż na bit**: wykrywa rytm w muzyce, tnie klipy na uderzeniach i dodaje błyski, glitch lub wstrząsy na cięciach.
 - **Nakładki**: 30 animowanych nakładek rysowanych na żywo (wycieki światła, błyski, fala uderzeniowa, linie prędkości, iskry, żar, bokeh, deszcz, błyskawice, konfetti…).
 - **Pakiety przejść**: jedno przejście (lub losowe) na wszystkich cięciach.
+
+**Oś czasu**
+- **Pliki trafiają tylko do biblioteki** (Media) i dopiero stamtąd przeciągasz je na oś.
+- **Nowe ścieżki:** przeciągnij klip (albo plik z biblioteki) na pasek „+ nowa ścieżka” u góry (obraz/nakładka) lub na dole (audio), a powstanie nowa ścieżka — do 8 ścieżek obrazu i 5 audio; puste znikają same.
+- **Bez „zasysania”:** po usunięciu klipu pozostałe zostają tam, gdzie są (zostaje luka, w którą możesz coś wstawić). Magnetyczną ścieżkę główną (klipy zawsze się stykają) włączysz przyciskiem z łańcuchem.
 
 **Narzędzia i eksport**
 - Usuwanie tła ze zdjęcia (PNG), asystent Claude (napisy, hooki, opis i hasztagi), auto-rytm, odłączanie dźwięku, zatrzymanie klatki, zrzut klatki.

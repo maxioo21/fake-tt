@@ -189,13 +189,43 @@ const Planner = (() => {
 
 /* ---------- łączniki do dowolnego AI (opcjonalne; klucze zostają tylko na Twoim urządzeniu) ---------- */
 const AIProv = {
-  cfg: (() => { try { return Object.assign({ provider: 'local', url: '', key: '', model: '' }, JSON.parse(localStorage.getItem('kadr.ai') || '{}')); } catch (e) { return { provider: 'local', url: '', key: '', model: '' }; } })(),
-  save() { try { localStorage.setItem('kadr.ai', JSON.stringify(this.cfg)); } catch (e) { /* ok */ } },
-  PROVIDERS: [
-    ['local', 'Lokalny planer (bez AI, za darmo)'], ['ollama', 'Ollama (AI lokalnie na Twoim komputerze, za darmo)'], ['gemini', 'Google Gemini (darmowy klucz API)'],
-    ['openai', 'OpenAI-kompatybilne (OpenRouter, Groq, LM Studio, OpenAI…)'],
+  /* kilka darmowych AI na liście: gdy jedno wyczerpie limit, aplikacja przełącza się na następne (w kółko), a AI zostawiają sobie notatki o zadaniu */
+  PRESETS: [
+    { id: 'gemini', label: 'Google Gemini (darmowy klucz)', type: 'gemini', url: '', model: 'gemini-2.0-flash', hint: 'Klucz: aistudio.google.com → Get API key' },
+    { id: 'groq', label: 'Groq (darmowy plan)', type: 'openai', url: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile', hint: 'Klucz: console.groq.com' },
+    { id: 'openrouter', label: 'OpenRouter (modele „:free”)', type: 'openai', url: 'https://openrouter.ai/api/v1', model: 'meta-llama/llama-3.3-70b-instruct:free', hint: 'Klucz: openrouter.ai/keys' },
+    { id: 'cerebras', label: 'Cerebras (darmowy plan)', type: 'openai', url: 'https://api.cerebras.ai/v1', model: 'llama-3.3-70b', hint: 'Klucz: cloud.cerebras.ai' },
+    { id: 'mistral', label: 'Mistral (plan darmowy)', type: 'openai', url: 'https://api.mistral.ai/v1', model: 'mistral-small-latest', hint: 'Klucz: console.mistral.ai' },
+    { id: 'openai', label: 'OpenAI / ChatGPT (API, płatne)', type: 'openai', url: 'https://api.openai.com/v1', model: 'gpt-4o-mini', hint: 'Do ChatGPT potrzebny jest klucz API (platform.openai.com); sam abonament ChatGPT nie wystarczy' },
+    { id: 'ollama', label: 'Ollama (lokalnie, za darmo)', type: 'ollama', url: 'http://localhost:11434', model: 'llama3.1', hint: 'Zainstaluj ollama.com i pobierz model, np. „ollama pull llama3.1”' },
+    { id: 'custom', label: 'Własne API zgodne z OpenAI', type: 'openai', url: '', model: '', hint: 'Podaj adres kończący się na /v1, klucz i nazwę modelu' },
   ],
-  DEFAULTS: { ollama: { url: 'http://localhost:11434', model: 'llama3.1' }, gemini: { url: '', model: 'gemini-2.0-flash' }, openai: { url: 'https://openrouter.ai/api/v1', model: 'meta-llama/llama-3.3-70b-instruct:free' } },
+  mkProvider(presetId) {
+    const pr = this.PRESETS.find((q) => q.id === presetId) || this.PRESETS[this.PRESETS.length - 1];
+    return { id: 'p' + Math.random().toString(36).slice(2, 8), preset: pr.id, type: pr.type, label: pr.label.replace(/ \(.*\)$/, ''), url: pr.url, key: '', model: pr.model, enabled: true, cd: 0, cdWhy: '', err: '', ok: 0, fail: 0, lastOk: 0 };
+  },
+  load() {
+    let c = {}; try { c = JSON.parse(localStorage.getItem('kadr.ai') || '{}'); } catch (e) { c = {}; }
+    if (!Array.isArray(c.providers)) {   /* migracja z pojedynczego dostawcy */
+      c.providers = [];
+      if (c.provider && !['local', 'multi'].includes(c.provider)) { const pv = this.mkProvider(c.provider === 'openai' ? 'custom' : c.provider); Object.assign(pv, { url: c.url || pv.url, key: c.key || '', model: c.model || pv.model }); c.providers.push(pv); c.useAI = true; }
+    }
+    c.providers = c.providers.map((q) => Object.assign({ type: 'openai', label: 'AI', url: '', key: '', model: '', enabled: true, cd: 0, cdWhy: '', err: '', ok: 0, fail: 0, lastOk: 0 }, q));
+    c.useAI = c.useAI == null ? false : !!c.useAI; c.cursor = c.cursor | 0; c.review = c.review !== false;
+    return c;
+  },
+  save() { this.recompute(); try { localStorage.setItem('kadr.ai', JSON.stringify(this.cfg)); localStorage.setItem('kadr.ailog', JSON.stringify(this.log.slice(-80))); localStorage.setItem('kadr.aijobs', JSON.stringify(this.jobs.slice(-20))); } catch (e) { /* ok */ } },
+  recompute() { this.cfg.provider = this.cfg.useAI && this.cfg.providers.some((q) => q.enabled) ? 'multi' : 'local'; },
+  log: [], jobs: [], cur: '', lastProv: null, onStatus: null,
+  status(t) { this.cur = t; try { if (this.onStatus) this.onStatus(t); } catch (e) { /* ok */ } },
+  hm(t) { return new Date(t).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }); },
+  logAdd(o) { this.log.push({ t: Date.now(), provider: o.p ? o.p.label : '—', stage: o.stage || '', r: o.r, msg: o.msg || '' }); if (this.log.length > 120) this.log.shift(); },
+  newJob(task) { const j = { id: Date.now().toString(36), task: String(task).slice(0, 120), started: Date.now(), notes: [] }; this.jobs.push(j); if (this.jobs.length > 20) this.jobs.shift(); return j; },
+  penalize(p, why, stage, job) {
+    if (!p) return; p.fail++; p.cd = Date.now() + 20000; p.cdWhy = why; p.err = why.slice(0, 160);
+    const L = this.cfg.providers.filter((q) => q.enabled), i = L.indexOf(p); if (i >= 0) this.cfg.cursor = (i + 1) % L.length;
+    if (job) job.notes.push({ provider: p.label, stage, at: Date.now(), text: 'przerwano: ' + why }); this.logAdd({ p, stage, r: 'bad', msg: why }); this.save();
+  },
   system() {
     const acts = Anim.ACT_LIST.filter((q) => !['slapped', 'punched', 'kicked', 'pushed', 'hit', 'hugged'].includes(q));
     return `You are the animation director of a small 2D/3D animation engine. Convert the user's request (any language) into ONE JSON object and nothing else. Think carefully and follow EVERY detail of the request (names, order of actions, style, duration, numbers, texts). First decide "kind":
@@ -203,7 +233,7 @@ const AIProv = {
 Rules: 1-4 characters with ids A,B,C,D; two characters start ~4.6 m apart facing each other; walking 1.45 m/s, running 3.6 m/s ("approach" from the start takes ~3 s). Different characters' steps may overlap; one character's steps must not. Acts needing a target (approach, slap, punch, kick, push, hug, kiss, throw, point, look, shout, sword) must set "target". Victim reactions are automatic — do NOT add them. For a block-world / voxel-game / Minecraft-like request use "model":"block", a voxel* background, and for Minecraft's Steve/Alex set "mcSkin":"steve"/"alex" (the app downloads the real skin by nickname). Respect the requested total duration: all steps must end about 0.7 s before it. If no listed act fits, invent a NEW move: act "custom", "n":"short name", "dur":seconds, "keys": 3-10 keyframes [{"t":0..1,"lean":rad,"twist":rad,"roll":rad,"hp":rad,"hy":rad,"hr":rad,"rootY":m,"air":m,"bp":rad,"L":[pitch,roll,elbow],"R":[pitch,roll,elbow],"LL":[pitch,roll,knee],"RL":[pitch,roll,knee],"eyes":"open|closed|happy|x","mouth":0..1,"smile":-1..1,"brow":-1..1}] (radians; arm pitch forward +, arm roll outward + (2.5 = overhead), leg pitch forward +, knee flex +, lean forward +, hp + = nod, bp -1.5 = lying on the back).
 (B) "motion": motion graphics — counters, countdowns, timers, progress/loading bars, titles, quotes, charts, particles, abstract shapes, anything flat 2D. Schema: {"kind":"motion","understanding":"...","assumptions":[],"dur":seconds,"bg":{"type":"gradient","colors":["#hex",...],"angle":deg},"bgfx":[{"type":"stars|bokeh|rays|grid|vignette","count":n,"color":"css"}],"layers":[{"type":"text|rect|circle|line|ring|bar|emoji|poly|particles","at":sec,"dur":sec,"x":0..1,"y":0..1,"opacity":1,"rot":deg,"scale":1,"copies":n,"blend":"lighter"}]}.
 Every numeric property may be a number or an EXPRESSION string evaluated each frame. Variables: t (scene seconds), u (t/dur), lt (seconds since layer start), lu (0..1 over the layer's life), i (copy index), n (copies), f (i/(n-1)), W, H. Functions: sin cos abs min max floor round sqrt pow lerp(a,b,k) clamp(v,a,b) map(v,a,b,c,d) fract mod ease easeIn easeOut easeInOut easeOutBack easeOutBounce easeOutElastic rand(seed) noise(x) hsl(h,s,l) pad(n,len) fmt(n) pct(v) time(sec) timecc(sec) typed(str,k) upper. Operators + - * / % ** < > <= >= == != && || ?: . Text uses {expression} templates, e.g. "{round(lerp(1,100,lu))}". Colors can be an expression when prefixed with "=", e.g. "=hsl(lt*90,90,60)". Layer props: text{text,size(fraction of height),color,font,weight,glow,glowColor,stroke{w,color},spacing,align}; rect{w,h,radius,color,color2}; circle{r,color,fill,stroke{w,color}}; line{x2,y2,width}; ring{r,width,value,trackColor}; bar{w,h,value,trackColor,radius}; emoji{char,size}; poly{points:[[x,y],...] in height units relative to the center,closed}; particles{count,life,speed,gravity,size,shape:circle|square|star,direction:up|down|burst|out,spreadX,spreadY,colors:[...]}. Positions are fractions of the frame (0..1). Fonts: ${Motion.FONTS.join(', ')}. Make it polished: easing, glow, secondary elements.
-Output valid JSON only.`;
+Also add a top-level "handoff": one short sentence in Polish telling a colleague AI what you decided and what remains to be checked (it is shown to the next assistant if you stop). Output valid JSON only.`;
   },
   reviewSystem() { return 'You are a meticulous reviewer of animation scenarios. You get the USER REQUEST and a DRAFT JSON built for the animation engine described earlier. Check EVERY requirement against the draft: characters and their names/skins, the order and meaning of actions, targets, style, background, duration (steps should end ~0.7 s before it), numbers and texts. Fix every mismatch, keep the same JSON schema (kind characters or motion) and return the corrected COMPLETE JSON only. If the draft is already perfect, return it unchanged.'; },
   /* w aplikacji desktopowej zapytania idą przez proces główny (bez blokad CORS); w przeglądarce zwykły fetch */
@@ -225,30 +255,81 @@ Output valid JSON only.`;
     return raw;
   },
   async fetchJson(url, opt, ms = 60000) {
-    try { const r = await this.net(url, opt, ms); if (!r.ok) { let b = ''; try { b = (await r.text()).slice(0, 160); } catch (e) { /* ok */ } throw new Error('HTTP ' + r.status + (b ? ' ' + b : '')); } return await r.json(); }
-    catch (e) { throw new Error(this.niceError(e)); }
+    let r;
+    try { r = await this.net(url, opt, ms); } catch (e) { const er = new Error(this.niceError(e)); er.net = true; throw er; }
+    if (!r.ok) { let b = ''; try { b = (await r.text()).slice(0, 300); } catch (e) { /* ok */ } const er = new Error('HTTP ' + r.status + (b ? ' ' + b.slice(0, 160) : '')); er.status = r.status; er.retryAfter = r.headers && r.headers.get ? r.headers.get('retry-after') : null; er.bodyText = b; throw er; }
+    try { return await r.json(); } catch (e) { const er = new Error('odpowiedź nie jest JSON-em'); er.bad = true; throw er; }
   },
-  async complete(userText, sysOverride) {
-    const c = this.cfg, d = this.DEFAULTS[c.provider] || {}, model = c.model || d.model, sys = sysOverride || this.system();
-    if (c.provider === 'ollama') { const j = await this.fetchJson((c.url || d.url).replace(/\/$/, '') + '/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, stream: false, format: 'json', messages: [{ role: 'system', content: sys }, { role: 'user', content: userText }] }) }, 180000); return j.message && j.message.content; }
-    if (c.provider === 'gemini') { if (!c.key) throw new Error('podaj klucz API Gemini'); const j = await this.fetchJson(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(c.key)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ systemInstruction: { parts: [{ text: sys }] }, contents: [{ role: 'user', parts: [{ text: userText }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.4 } }) }); return j.candidates && j.candidates[0] && j.candidates[0].content.parts[0].text; }
-    if (c.provider === 'openai') {
-      const url = (c.url || d.url).replace(/\/$/, '') + '/chat/completions', hd = { 'Content-Type': 'application/json' }; if (c.key) hd.Authorization = 'Bearer ' + c.key;
-      const body = { model, temperature: 0.4, messages: [{ role: 'system', content: sys }, { role: 'user', content: userText }] };
-      let j; try { j = await this.fetchJson(url, { method: 'POST', headers: hd, body: JSON.stringify(Object.assign({ response_format: { type: 'json_object' } }, body)) }); } catch (e) { if (!/HTTP 4/.test(e.message)) throw e; j = await this.fetchJson(url, { method: 'POST', headers: hd, body: JSON.stringify(body) }); }
-      return j.choices && j.choices[0] && j.choices[0].message.content;
+  /* rozpoznaje, dlaczego AI zawiodło, i na jak długo je odłożyć */
+  classify(e) {
+    const st = e.status, body = ((e.bodyText || '') + ' ' + (e.message || '')).toLowerCase(), ra = e.retryAfter ? Math.min(3600, +e.retryAfter || 0) * 1000 : 0;
+    const quota = /quota|daily|per day|billing|credit|insufficient|exceeded your current|out of tokens|free tier|per month/.test(body);
+    if (st === 429 || /rate.?limit|too many requests|resource_exhausted/.test(body)) return quota ? { k: 'quota', ms: 3 * 3600e3, why: 'dzienny/miesięczny limit wyczerpany' } : { k: 'limit', ms: Math.max(ra, 60e3), why: 'chwilowy limit zapytań' };
+    if (st === 402 || (st === 403 && quota)) return { k: 'quota', ms: 6 * 3600e3, why: 'brak środków lub limit' };
+    if (st === 401 || st === 403) return { k: 'auth', ms: 12 * 3600e3, why: 'zły lub brakujący klucz API' };
+    if (st === 404 || st === 400) return { k: 'bad', ms: 15 * 60e3, why: 'nieprawidłowy model lub adres (HTTP ' + st + ')' };
+    if (e.bad) return { k: 'badout', ms: 20e3, why: 'niepoprawna odpowiedź' };
+    return { k: 'net', ms: 45e3, why: String(e.message || 'błąd połączenia').slice(0, 90) };
+  },
+  /* jedno zapytanie do konkretnego AI z listy */
+  async callOne(p, userText, sys) {
+    const pr = this.PRESETS.find((q) => q.id === p.preset) || {}, model = p.model || pr.model || '', base = (p.url || pr.url || '').replace(/\/$/, '');
+    if (p.type === 'ollama') { const j = await this.fetchJson((base || 'http://localhost:11434') + '/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, stream: false, format: 'json', messages: [{ role: 'system', content: sys }, { role: 'user', content: userText }] }) }, 180000); return j.message && j.message.content; }
+    if (p.type === 'gemini') { if (!p.key) { const er = new Error('brak klucza API Gemini'); er.status = 401; throw er; } const j = await this.fetchJson(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(p.key)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ systemInstruction: { parts: [{ text: sys }] }, contents: [{ role: 'user', parts: [{ text: userText }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.4 } }) }); return j.candidates && j.candidates[0] && j.candidates[0].content.parts[0].text; }
+    const url = base + '/chat/completions', hd = { 'Content-Type': 'application/json' }; if (p.key) hd.Authorization = 'Bearer ' + p.key;
+    const body = { model, temperature: 0.4, messages: [{ role: 'system', content: sys }, { role: 'user', content: userText }] };
+    let j; try { j = await this.fetchJson(url, { method: 'POST', headers: hd, body: JSON.stringify(Object.assign({ response_format: { type: 'json_object' } }, body)) }); } catch (e) { if (!(e.status === 400 || e.status === 422)) throw e; j = await this.fetchJson(url, { method: 'POST', headers: hd, body: JSON.stringify(body) }); }
+    return j.choices && j.choices[0] && j.choices[0].message.content;
+  },
+  /* ROUTER: bierze pierwsze AI, które nie jest na przerwie; po wyczerpaniu limitu przełącza na następne i tak w kółko */
+  async complete(userText, sysOverride, o = {}) {
+    const job = o.job || null, stage = o.stage || 'zapytanie', sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    let last = null;
+    for (let guard = 0; guard < 24; guard++) {
+      const L = this.cfg.providers.filter((q) => q.enabled);
+      if (!L.length) throw new Error('Nie włączono żadnego AI (zakładka AI → Ustawienia AI).');
+      const now = Date.now(), cur = this.cfg.cursor % L.length;
+      const ready = L.map((q, i) => ({ p: q, i, rank: (i - cur + L.length) % L.length })).filter((x) => x.p.cd <= now).sort((a, b) => a.rank - b.rank);
+      if (!ready.length) {
+        const soon = L.reduce((m, q) => (q.cd < m.cd ? q : m), L[0]), wait = soon.cd - now;
+        if (wait <= 40000) { this.status(`Wszystkie AI na przerwie — czekam ${Math.ceil(wait / 1000)} s na „${soon.label}”…`); await sleep(wait + 300); continue; }
+        throw new Error(`Wszystkie skonfigurowane AI wyczerpały limity. Najbliższe wraca o ${this.hm(soon.cd)} („${soon.label}”). Użyj lokalnego planera albo dodaj kolejne AI.`);
+      }
+      const { p, i } = ready[0]; this.cfg.cursor = i;
+      const handoff = job && job.notes.length ? '\n\n[PRZEKAZANIE ZADANIA od poprzednich asystentów AI — kontynuujesz to samo zadanie, poprzedni model przerwał pracę. Notatki:]\n' + job.notes.slice(-6).map((n) => `- ${n.provider} (${n.stage}): ${n.text}`).join('\n') : '';
+      this.status(`${p.label} — ${stage}…`);
+      try {
+        const out = await this.callOne(p, userText + handoff, sysOverride || this.system());
+        p.ok++; p.lastOk = Date.now(); p.err = ''; p.cd = 0; p.cdWhy = ''; this.lastProv = p; this.logAdd({ p, stage, r: 'ok' }); this.save();
+        return out;
+      } catch (e) {
+        const c = this.classify(e); p.fail++; p.cd = Date.now() + c.ms; p.cdWhy = c.why; p.err = String(e.message).slice(0, 160); const nxt = L[(i + 1) % L.length];
+        if (job) job.notes.push({ provider: p.label, stage, at: Date.now(), text: 'przerwano: ' + c.why + (L.length > 1 ? ` — przejmuje „${nxt.label}”; „${p.label}” wróci ok. ${this.hm(p.cd)}` : '') });
+        this.logAdd({ p, stage, r: c.k, msg: c.why }); this.cfg.cursor = (i + 1) % L.length; this.save(); last = e;
+        this.status(`${p.label}: ${c.why} → przełączam na „${nxt.label}”…`);
+      }
     }
-    throw new Error('nie wybrano dostawcy AI');
+    throw last || new Error('AI nie odpowiedziało');
   },
+  async test(p) { try { const out = await this.callOne(p, 'Return exactly this JSON: {"ok":true}', 'Reply with JSON only.'); return { ok: /ok/.test(String(out)), msg: String(out).slice(0, 60) }; } catch (e) { const c = this.classify(e); return { ok: false, msg: c.why + ' — ' + String(e.message).slice(0, 100) }; } },
   async plan(text) {
     const parse = (out) => { const m = /\{[\s\S]*\}/.exec(String(out || '')); if (!m) throw new Error('odpowiedź nie jest JSON-em'); return JSON.parse(m[0]); };
     const build = (o) => {
       if (o && (o.kind === 'motion' || (!o.chars && o.layers))) { const sc = Motion.sanitize(o); if (!sc) throw new Error('AI zwróciło pustą grafikę'); sc.prompt = text; return sc; }
       const sc = Anim.sanitize(o); if (!sc || !sc.steps.length) throw new Error('AI nie zaplanowało żadnych czynności'); sc.prompt = text; return sc;
     };
-    let o = parse(await this.complete(text)), sc = build(o), reviewed = false;
-    if (this.cfg.review !== false) { try { const o2 = parse(await this.complete('USER REQUEST:\n' + text + '\n\nDRAFT JSON:\n' + JSON.stringify(o), this.reviewSystem())), sc2 = build(o2); sc = sc2; o = o2; reviewed = true; } catch (e) { /* zostaje szkic */ } }
-    sc.understanding = String(o.understanding || '').slice(0, 500); sc.assumptions = Array.isArray(o.assumptions) ? o.assumptions.slice(0, 6).map((q) => String(q).slice(0, 160)) : []; sc.reviewed = reviewed;
+    const job = this.newJob(text);
+    const ask = async (msg, sys, stage) => {
+      for (let t = 0; t < 4; t++) {
+        const out = await this.complete(msg, sys, { job, stage }), prov = this.lastProv;
+        try { const o = parse(out), sc = build(o); job.notes.push({ provider: prov.label, stage, at: Date.now(), text: String(o.handoff || ('zakończono etap „' + stage + '”')).slice(0, 220) }); this.save(); return { o, sc }; }
+        catch (e) { this.penalize(prov, 'niepoprawna odpowiedź (' + e.message + ')', stage, job); }
+      }
+      throw new Error('żadne AI nie zwróciło poprawnego scenariusza');
+    };
+    let { o, sc } = await ask(text, undefined, 'plan'), reviewed = false;
+    if (this.cfg.review !== false) { try { const r2 = await ask('USER REQUEST:\n' + text + '\n\nDRAFT JSON:\n' + JSON.stringify(o), this.reviewSystem(), 'sprawdzanie'); sc = r2.sc; o = r2.o; reviewed = true; } catch (e) { /* zostaje szkic */ } }
+    sc.understanding = String(o.understanding || '').slice(0, 500); sc.assumptions = Array.isArray(o.assumptions) ? o.assumptions.slice(0, 6).map((q) => String(q).slice(0, 160)) : []; sc.reviewed = reviewed; sc.aiLog = job.notes.map((n) => `${n.provider} (${n.stage}): ${n.text}`);
     return sc;
   },
   /* obraz AI z darmowego Pollinations (bez klucza); wymaga internetu */
@@ -258,6 +339,9 @@ Output valid JSON only.`;
     catch (e) { throw new Error(this.niceError(e)); }
   },
 };
+
+AIProv.cfg = AIProv.load(); AIProv.recompute();
+try { AIProv.log = JSON.parse(localStorage.getItem('kadr.ailog') || '[]'); AIProv.jobs = JSON.parse(localStorage.getItem('kadr.aijobs') || '[]'); } catch (e) { AIProv.log = []; AIProv.jobs = []; }
 
 /* ---------- skiny (układ 64×64 jak w grach z klockami) ---------- */
 const SkinLib = {
@@ -360,12 +444,12 @@ async function renderSceneVideo(scene, cb) {
   return { blob: new Blob([muxer.target.buffer], { type: cont === 'mp4' ? 'video/mp4' : 'video/webm' }), container: cont, w: W, h: H };
 }
 UI.aiGenerate = async function (variant) {
-  const st = this._ai, text = st.text.trim();
+  const st = this._ai, text = st.text.trim(); AIProv.onStatus = (t) => { const el = document.getElementById('aistatus'); if (el) el.textContent = t; };
   if (!text) { toast('Opisz najpierw, co mam zrobić'); return; }
   const prev = st.scene; st.busy = true; st.notes = []; st.report = null; if (!variant) { st.variantN = 0; st.scene = null; } this.renderPanel(true);
   let scene = null, base = variant && st.base ? st.base : null;
   if (!base) {
-    if (AIProv.cfg.provider !== 'local') { try { scene = await AIProv.plan(text); st.notes.push(`Scenariusz ułożył zewnętrzny model AI (${AIProv.cfg.provider}${scene.reviewed ? ', po sprawdzeniu i poprawce' : ''}).`); } catch (e) { st.notes.push('AI nie odpowiedziało (' + e.message + ') — użyłem lokalnego planera.'); } }
+    if (AIProv.cfg.provider !== 'local') { try { scene = await AIProv.plan(text); st.notes.push(`Scenariusz ułożyło zewnętrzne AI${scene.reviewed ? ' (po sprawdzeniu i poprawce)' : ''}.`, ...(scene.aiLog || []).map((x) => 'Przebieg pracy AI: ' + x)); } catch (e) { st.notes.push('AI nie odpowiedziało (' + e.message + ') — użyłem lokalnego planera.'); } }
     if (!scene) { const r = Planner.auto(text); scene = r.scene; st.notes.push(...r.notes); st.report = r.report; }
     if (scene.kind !== 'motion') {
       const have = new Set(scene.steps.map((q) => q.act)); const miss = [...new Set(Planner.verbsIn(text))].filter((a) => !have.has(a) && !(a === 'approach' && have.has('runto')));
@@ -391,7 +475,7 @@ UI.pAI = function (box) {
   box.append(h('div', { class: 'p-head' }, h('h3', {}, 'AI Studio'), h('span', { class: 'badge' }, 'NOWE')));
   box.append(h('div', { class: 'card2' }, h('h5', {}, 'Animator scen 2D / 3D'),
     F.hint('Opisz scenę po polsku — np. „pierwsza postać podchodzi do drugiej i uderza ją z liścia”. Własny silnik narysuje animację 2D lub 3D z kamerą, efektami i tłem. Działa lokalnie i za darmo: bez Claude, bez kredytów.'),
-    h('p', { class: 'hint' }, 'Planer: ' + (AIProv.PROVIDERS.find((p) => p[0] === A.provider) || [])[1] + '. Zewnętrzne AI (np. darmowy Gemini albo Ollama) włączysz niżej w ustawieniach — wtedy układa dłuższe, bardziej swobodne scenariusze.'),
+    h('p', { class: 'hint' }, 'Planer: ' + (A.provider === 'multi' ? 'zewnętrzne AI z listy (' + A.providers.filter((q) => q.enabled).map((q) => q.label).join(' → ') + '), z automatycznym przełączaniem po wyczerpaniu limitu' : 'lokalny, bez AI, za darmo') + '. Kilka darmowych AI włączysz niżej w ustawieniach — wtedy planują swobodniej i dokładniej.'),
     h('textarea', { class: 'txt', rows: 4, placeholder: 'Opisz scenę… np. Dziewczyna płacze, a chłopak podchodzi i ją przytula', oninput: (e) => { st.text = e.target.value; } }, st.text),
     h('div', { class: 'chips ex' }, Planner.EXAMPLES.map((e) => h('button', { class: 'chip', onclick: () => { st.text = e; this.renderPanel(true); } }, e.length > 44 ? e.slice(0, 42) + '…' : e))),
     F.seg('Styl', [['auto', 'Auto'], ['3d', '3D'], ['2d', '2D']], () => st.style, (v) => { st.style = v; setTimeout(() => this.renderPanel(true), 0); }),
@@ -399,7 +483,7 @@ UI.pAI = function (box) {
     F.seg('Kamera', [['auto', 'Auto'], ['wide', 'Szeroko'], ['close', 'Blisko']], () => st.cam, (v) => { st.cam = v; setTimeout(() => this.renderPanel(true), 0); }),
     h('label', { class: 'ctl' }, h('div', { class: 'cl' }, h('span', {}, 'Docelowa długość (s) — puste = automatycznie')), h('input', { type: 'number', min: 1, max: 180, step: 0.5, class: 'txt', value: st.target || '', placeholder: 'np. 5', onchange: (e) => { st.target = +e.target.value || 0; } })),
     F.seg('Postacie', [['auto', 'Auto'], ['round', 'Okrągłe'], ['block', 'Klockowe']], () => st.model, (v) => { st.model = v; setTimeout(() => this.renderPanel(true), 0); }),
-    F.btn(st.busy ? 'Układam scenariusz…' : 'Generuj animację', () => { if (!st.busy) this.aiGenerate(); }, 'primary block', 'sparkles')));
+    F.btn(st.busy ? 'Układam scenariusz…' : 'Generuj animację', () => { if (!st.busy) this.aiGenerate(); }, 'primary block', 'sparkles'), h('p', { id: 'aistatus', class: 'hint' }, st.busy ? (AIProv.cur || '') : '')));
   if (st.notes.length) box.append(h('div', { class: 'note' }, st.notes.map((n) => h('div', {}, n))));
   if (st.scene) {
     const sc = st.scene, asp = (ASPECTS[P.aspect] || [16, 9]), W = 320, Hh = Math.round(W * asp[1] / asp[0]);
@@ -433,18 +517,7 @@ UI.pAI = function (box) {
       catch (e) { st.imgMsg = 'Nie udało się: ' + e.message; }
       st.imgBusy = false; this.renderPanel(true);
     }, 'block', 'image'), st.imgMsg ? h('p', { class: 'hint' }, st.imgMsg) : null));
-  /* ustawienia dostawcy */
-  const d = AIProv.DEFAULTS[A.provider] || {};
-  box.append(h('div', { class: 'card2' }, h('h5', {}, 'Ustawienia AI (opcjonalne)'),
-    window.kadrNative ? h('p', { class: 'hint' }, 'Aplikacja desktopowa: połączenia z AI idą przez aplikację, więc nic ich nie blokuje, a ustawienia zostają po zamknięciu.') : null,
-    F.hint('Domyślnie nie potrzebujesz żadnego AI. Jeśli chcesz, aby AI układało scenariusze, wybierz dostawcę. Ollama działa lokalnie i jest darmowa; Gemini i OpenRouter mają darmowe plany. Klucz jest zapisany tylko w tej przeglądarce/aplikacji i nie trafia do nas.'),
-    F.select('Dostawca', AIProv.PROVIDERS, () => A.provider, (v) => { A.provider = v; AIProv.save(); UI.renderPanel(true); }),
-    A.provider !== 'local' ? h('div', { class: 'aiform' },
-      A.provider !== 'gemini' ? h('input', { type: 'text', class: 'txt', placeholder: 'Adres: ' + (d.url || ''), value: A.url, onchange: (e) => { A.url = e.target.value.trim(); AIProv.save(); } }) : null,
-      A.provider !== 'ollama' ? h('input', { type: 'password', class: 'txt', placeholder: 'Klucz API', value: A.key, onchange: (e) => { A.key = e.target.value.trim(); AIProv.save(); } }) : null,
-      h('input', { type: 'text', class: 'txt', placeholder: 'Model: ' + (d.model || ''), value: A.model, onchange: (e) => { A.model = e.target.value.trim(); AIProv.save(); } }),
-      F.btn('Przetestuj połączenie', async () => { st.testMsg = 'Łączę…'; UI.renderPanel(true); try { const sc = await AIProv.plan('Dwie postacie: pierwsza macha do drugiej.'); st.testMsg = 'Działa! Model zwrócił scenariusz (' + sc.steps.length + ' kroków).'; } catch (e) { st.testMsg = 'Błąd: ' + e.message; } UI.renderPanel(true); }, 'sm', 'bolt'),
-      st.testMsg ? h('p', { class: 'hint' }, st.testMsg) : null) : null));
+  this.aiSettings(box);
   box.append(F.hint('Wskazówka: po dodaniu na oś kliknij animację i otwórz „Edytuj → Scena”, aby zmienić postacie, kroki, tło i kamerę. Animacja wchodzi do eksportu jak zwykły klip.'));
 };
 
@@ -519,4 +592,39 @@ UI.insMotion = function (b, c) {
   const ta = h('textarea', { class: 'txt code', rows: 8, spellcheck: 'false' }, JSON.stringify({ dur: sc.dur, bg: sc.bg, bgfx: sc.bgfx, layers: sc.layers }, null, 1));
   b.append(ta, F.btn('Zastosuj zmiany z tekstu', () => { try { const o = JSON.parse(ta.value), ns = Motion.sanitize(Object.assign({}, o, { prompt: sc.prompt })); if (!ns) throw new Error('brak poprawnych warstw'); Object.keys(sc).forEach((k) => delete sc[k]); Object.assign(sc, ns); c.dur = Math.max(c.dur, 0.5); commit(); toast('Zastosowano'); } catch (e) { toast('Błąd w JSON: ' + e.message, 'err'); } }, 'sm', 'check'),
     F.hint('Wartości liczbowe mogą być wyrażeniami zależnymi od czasu (np. "lerp(0,1,lu)"), a teksty mogą zawierać {wyrażenia}. Funkcje: sin, cos, lerp, clamp, ease, easeOutBack, rand, fmt, time…'));
+};
+
+/* ---------- ustawienia AI: lista darmowych AI z automatycznym przełączaniem ---------- */
+UI.aiSettings = function (box) {
+  const A = AIProv.cfg, now = Date.now(), re = () => UI.renderPanel(true), later = () => setTimeout(re, 0);
+  const card = h('div', { class: 'card2' }, h('h5', {}, 'Ustawienia AI (opcjonalne)'),
+    window.kadrNative ? h('p', { class: 'hint' }, 'Aplikacja desktopowa: połączenia z AI idą przez aplikację, więc nic ich nie blokuje, a ustawienia zostają po zamknięciu.') : null,
+    F.hint('Dodaj kilka darmowych AI. Gdy jedno wyczerpie limit (albo przestanie odpowiadać), aplikacja sama przełączy się na następne, a po odnowieniu limitu wróci do pierwszego — w kółko. Każde AI zostawia notatkę o tym, co zrobiło, a następne ją czyta i kontynuuje to samo zadanie. Klucze zostają tylko na Twoim urządzeniu.'),
+    F.toggle('Używaj zewnętrznego AI (zamiast samego lokalnego planera)', () => A.useAI, (v) => { A.useAI = v; AIProv.save(); later(); }),
+    F.toggle('Sprawdzaj i poprawiaj scenariusz drugim zapytaniem (dokładniej, ale 2× więcej zapytań)', () => A.review !== false, (v) => { A.review = v; AIProv.save(); }));
+  A.providers.forEach((p, i) => {
+    const pr = AIProv.PRESETS.find((q) => q.id === p.preset) || {}, cool = p.enabled && p.cd > now;
+    const status = !p.enabled ? 'wyłączone' : cool ? `przerwa do ${AIProv.hm(p.cd)} — ${p.cdWhy}` : (p.err ? 'ostatni błąd: ' + p.err : 'gotowe') + (p.ok ? ` · użyto ${p.ok}×` : '');
+    const mv = (d) => { const j = i + d; if (j < 0 || j >= A.providers.length) return; [A.providers[i], A.providers[j]] = [A.providers[j], A.providers[i]]; A.cursor = 0; AIProv.save(); re(); };
+    card.append(h('div', { class: 'prov ' + (!p.enabled ? 'off' : cool ? 'cool' : p.err ? 'err' : 'ok') },
+      h('div', { class: 'ph' }, h('b', {}, (i + 1) + '. ' + p.label), h('span', { class: 'phb' },
+        h('button', { class: 'tb', title: 'Wyżej (ważniejsze)', onclick: () => mv(-1), html: icon('chevDown', 13).replace('<svg', '<svg style="transform:rotate(180deg)"') }), h('button', { class: 'tb', title: 'Niżej', onclick: () => mv(1), html: icon('chevDown', 13) }),
+        h('button', { class: 'tb', title: 'Usuń z listy', onclick: () => { A.providers.splice(i, 1); AIProv.save(); re(); }, html: icon('trash', 13) }))),
+      h('div', { class: 'pst' }, status),
+      F.toggle('Włączone', () => p.enabled, (v) => { p.enabled = v; AIProv.save(); later(); }),
+      p.type !== 'gemini' ? h('input', { type: 'text', class: 'txt', placeholder: 'Adres, np. ' + (pr.url || 'https://…/v1'), value: p.url, onchange: (e) => { p.url = e.target.value.trim(); AIProv.save(); } }) : null,
+      p.type !== 'ollama' ? h('input', { type: 'password', class: 'txt', placeholder: 'Klucz API', value: p.key, onchange: (e) => { p.key = e.target.value.trim(); AIProv.save(); } }) : null,
+      h('input', { type: 'text', class: 'txt', placeholder: 'Model, np. ' + (pr.model || ''), value: p.model, onchange: (e) => { p.model = e.target.value.trim(); AIProv.save(); } }),
+      pr.hint ? h('p', { class: 'hint' }, pr.hint) : null,
+      h('div', { class: 'row2' }, F.btn('Przetestuj', async () => { toast('Testuję „' + p.label + '”…'); const r = await AIProv.test(p); if (r.ok) { p.err = ''; p.cd = 0; p.cdWhy = ''; AIProv.save(); } toast((r.ok ? 'Działa: ' : 'Błąd: ') + r.msg, r.ok ? undefined : 'err'); re(); }, 'sm', 'bolt'),
+        cool ? F.btn('Spróbuj teraz', () => { p.cd = 0; AIProv.save(); re(); }, 'sm', 'repeat') : null)));
+  });
+  const sel = h('select', { class: 'mini' }, AIProv.PRESETS.map((q) => h('option', { value: q.id }, q.label)));
+  card.append(h('div', { class: 'row2' }, sel, F.btn('Dodaj AI', () => { if (!A.providers.length) A.useAI = true; A.providers.push(AIProv.mkProvider(sel.value)); AIProv.save(); re(); }, 'sm', 'plus')));
+  const lg = AIProv.log.slice(-14).reverse(), R = { ok: 'OK', limit: 'limit zapytań', quota: 'limit wyczerpany', auth: 'błąd klucza', bad: 'zły model/adres', badout: 'zła odpowiedź', net: 'błąd połączenia' };
+  card.append(h('details', { class: 'ailog' }, h('summary', {}, 'Dziennik AI (' + AIProv.log.length + ' wpisów)'), h('ul', { class: 'steps' }, lg.length ? lg.map((e) => h('li', {}, `${AIProv.hm(e.t)} · ${e.provider} · ${e.stage} · ${R[e.r] || e.r}${e.msg ? ' — ' + e.msg : ''}`)) : [h('li', {}, 'Brak wpisów.')])));
+  const jb = AIProv.jobs.filter((j) => j.notes.length).slice(-4).reverse();
+  if (jb.length) card.append(h('details', { class: 'ailog' }, h('summary', {}, 'Notatki AI o zadaniach (przekazywanie pracy)'), ...jb.map((j) => h('div', { class: 'job' }, h('b', {}, j.task), h('ul', { class: 'steps' }, j.notes.map((n) => h('li', {}, `${n.provider} (${n.stage}): ${n.text}`)))))));
+  if (A.providers.some((q) => q.cd > now)) card.append(F.btn('Wyczyść wszystkie przerwy', () => { A.providers.forEach((q) => { q.cd = 0; q.cdWhy = ''; }); AIProv.save(); re(); }, 'sm', 'x'));
+  box.append(card);
 };

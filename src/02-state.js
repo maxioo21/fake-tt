@@ -2,15 +2,31 @@
 /* ============================================================
    Kadr Studio — stan projektu, historia, biblioteka mediów
    ============================================================ */
-const LANES = [
-  { id: 'v3', kind: 'v', label: 'Nakł. 2' },
-  { id: 'v2', kind: 'v', label: 'Nakł. 1' },
-  { id: 'v1', kind: 'v', label: 'Główna', main: true },
-  { id: 'a1', kind: 'a', label: 'Audio 1' },
-  { id: 'a2', kind: 'a', label: 'Audio 2' },
-];
-const VIS_ORDER = ['v1', 'v2', 'v3']; // od dołu do góry
-const laneKind = (id) => (LANES.find((l) => l.id === id) || {}).kind;
+/* ścieżki: domyślnie 3 obrazu + 2 audio; nowe powstają, gdy przeciągniesz klip na pasek „+ nowa ścieżka” */
+const LANES = [];
+const VIS_ORDER = []; // od dołu do góry
+const MAX_V = 8, MAX_A = 5;
+const laneNum = (id) => parseInt(String(id).slice(1), 10) || 0;
+const laneKind = (id) => (String(id).startsWith('new:') ? String(id)[4] : String(id)[0] === 'v' ? 'v' : String(id)[0] === 'a' ? 'a' : undefined);
+/* przelicza listę ścieżek na podstawie klipów; zwraca true, gdy się zmieniła */
+function syncLanes(needV, needA) {
+  let mv = Math.max(3, needV || 0), ma = Math.max(2, needA || 0);
+  for (const c of clips) { const n = laneNum(c.lane); if (c.lane[0] === 'v') mv = Math.max(mv, n); else if (c.lane[0] === 'a') ma = Math.max(ma, n); }
+  mv = Math.min(mv, MAX_V); ma = Math.min(ma, MAX_A);
+  const next = [];
+  for (let i = mv; i >= 1; i--) next.push(i === 1 ? { id: 'v1', kind: 'v', label: 'Główna', main: true } : { id: 'v' + i, kind: 'v', label: 'Nakł. ' + (i - 1) });
+  for (let i = 1; i <= ma; i++) next.push({ id: 'a' + i, kind: 'a', label: 'Audio ' + i });
+  const changed = next.length !== LANES.length || next.some((l, i) => l.id !== LANES[i].id);
+  if (changed) { LANES.length = 0; next.forEach((l) => LANES.push(l)); VIS_ORDER.length = 0; for (let i = 1; i <= mv; i++) VIS_ORDER.push('v' + i); }
+  return changed;
+}
+/* identyfikator nowej ścieżki danego rodzaju (albo ostatniej istniejącej, gdy osiągnięto limit) */
+function ensureLane(kindOrId) {
+  const kind = laneKind(kindOrId); if (!String(kindOrId).startsWith('new:')) return kindOrId;
+  const n = LANES.filter((l) => l.kind === kind).length, lim = kind === 'v' ? MAX_V : MAX_A;
+  if (n >= lim) return kind + (kind === 'v' ? MAX_V : MAX_A);
+  const id = kind + (n + 1); syncLanes(kind === 'v' ? n + 1 : 0, kind === 'a' ? n + 1 : 0); return id;
+}
 
 const ASPECTS = {
   '16:9': [16, 9], '9:16': [9, 16], '1:1': [1, 1], '4:5': [4, 5], '3:4': [3, 4], '4:3': [4, 3], '21:9': [21, 9],
@@ -20,11 +36,12 @@ const ASPECTS = {
 const P = { name: 'Mój film', aspect: '16:9', fps: 30, bg: '#000000', bgBlur: false, markers: [], lanes: { hidden: {}, muted: {}, locked: {} } };
 /* klipy (zmieniamy tablicę w miejscu, żeby referencje się nie psuły) */
 const clips = [];
+syncLanes();
 /* biblioteka mediów */
 const media = new Map();
 /* stan interfejsu */
 const S = {
-  time: 0, playing: false, sel: null, multi: [], zoom: 90, snap: true, magnet: true,
+  time: 0, playing: false, sel: null, multi: [], zoom: 90, snap: true, magnet: false,
   tab: 'media', insTab: null, picker: null, demo: false, previewScale: 1,
 };
 
@@ -144,8 +161,9 @@ function laneFreeAt(laneId, start, dur, ignoreId) {
 }
 /* znajdź ścieżkę nakładek wolną w danym przedziale (tekst, naklejki, efekty) */
 function freeOverlayLane(start, dur) {
-  for (const id of ['v3', 'v2']) if (laneFreeAt(id, start, dur)) return id;
-  return 'v3';
+  const ov = LANES.filter((l) => l.kind === 'v' && l.id !== 'v1').map((l) => l.id);
+  for (const id of ov) if (laneFreeAt(id, start, dur)) return id;
+  const nl = ensureLane('new:v'); return nl === 'v8' && !laneFreeAt(nl, start, dur) ? ov[0] : nl;
 }
 
 /* ---------- operacje na klipach ---------- */
@@ -270,7 +288,7 @@ function addFxLayer(patch) {
 const HIST = { undo: [], redo: [], last: '' };
 function snapshot() { return JSON.stringify({ P, clips }); }
 function commit() {
-  packMain();
+  packMain(); syncLanes();
   const s = snapshot();
   if (s !== HIST.last) {
     if (HIST.last) { HIST.undo.push(HIST.last); if (HIST.undo.length > 120) HIST.undo.shift(); }
@@ -286,6 +304,7 @@ function restore(s) {
   if (S.sel && !byId(S.sel)) S.sel = null;
   S.multi = (S.multi || []).filter((id) => byId(id));
   if (!P.lanes) P.lanes = { hidden: {}, muted: {}, locked: {} };
+  syncLanes();
   HIST.last = s;
   Bus.emit('change'); Bus.emit('project');
 }

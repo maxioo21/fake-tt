@@ -7,14 +7,13 @@ const App = {
     const added = [];
     for (const f of files) { const m = await importFile(f); if (m) added.push(m); }
     if (!added.length) return;
-    toast(added.length === 1 ? 'Dodano do biblioteki: ' + added[0].name : 'Dodano do biblioteki: ' + added.length + ' pliki');
+    toast((added.length === 1 ? 'Dodano do biblioteki: ' + added[0].name : 'Dodano do biblioteki: ' + added.length + ' pliki') + '. Przeciągnij na oś czasu, kiedy będziesz ich potrzebować.');
     if (S.demo) {   /* pierwszy własny import zastępuje projekt przykładowy (przykładowe pliki zostają w bibliotece) */
       clips.length = 0; S.sel = null; S.time = 0; S.demo = false;
       Object.assign(P, { name: 'Mój film', aspect: '16:9', fps: 30, bg: '#000000', bgBlur: false, markers: [], lanes: { hidden: {}, muted: {}, locked: {} } });
       resetHistory();
     }
-    if (!clips.length) { added.forEach((m) => addMediaClip(m, { keepAspect: false })); commit(); Engine.setupRenderer(); Engine.seek(0); }
-    else Bus.emit('media');
+    commit(); Engine.setupRenderer(); Bus.emit('media');   /* pliki trafiają tylko do biblioteki — na oś przeciągasz je sam */
   },
   addMedia(m) {
     addMediaClip(m); commit(); Engine.setupRenderer();

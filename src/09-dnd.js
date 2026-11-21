@@ -154,7 +154,8 @@ const DND = {
     const R = Engine.R;
     const group = (c) => { const ids = Act.ids(); return ids.includes(c.id) && ids.length > 1 ? ids.map(byId).filter(Boolean) : [c]; };
     const place = (c, tgt) => {   /* przenosi nowy klip na ścieżkę, na którą upuszczono (jeśli wolna) */
-      if (tgt.kind === 'lane' && laneKind(tgt.lane) === 'v' && tgt.lane !== 'v1' && laneFreeAt(tgt.lane, c.start, c.dur, c.id)) c.lane = tgt.lane;
+      if (tgt.kind === 'lane' && String(tgt.lane).startsWith('new:') && tgt.lane === 'new:v') c.lane = ensureLane(tgt.lane);
+      else if (tgt.kind === 'lane' && laneKind(tgt.lane) === 'v' && tgt.lane !== 'v1' && laneFreeAt(tgt.lane, c.start, c.dur, c.id)) c.lane = tgt.lane;
       if (tgt.kind === 'stage' || (tgt.kind === 'clip' && tgt.via === 'stage')) { c.x = clamp(tgt.px / R.W - 0.5, -0.6, 0.6); c.y = clamp(tgt.py / R.H - 0.5, -0.6, 0.6); }
     };
     const atTime = tg.t != null ? tg.t : S.time, keepT = S.time;
