@@ -162,6 +162,7 @@ const Exporter = {
       /* czcionki użyte w napisach */
       setP(0, 'Ładowanie czcionek…');
       for (const c of clips) if (c.type === 'text') { try { await document.fonts.load(`${c.text.bold ? 700 : 400} 40px "${c.text.font}"`); } catch (e) { /* ignoruj */ } }
+      for (const c of clips) if (c.type === 'scene') { try { await preloadScene(c.scene); } catch (e) { /* ignoruj */ } }
       /* dźwięk */
       let audioBuf = null;
       if (o.audio && info.audio) { setP(0, 'Miksowanie dźwięku…'); audioBuf = await this.mixAudio(dur); }

@@ -25,6 +25,9 @@ const Anim = (() => {
 
   /* ---------- szkielet ---------- */
   const B = { hip: 0.93, spine: 0.52, neck: 0.1, headR: 0.165, shW: 0.2, hipW: 0.09, ua: 0.3, fa: 0.28, th: 0.45, sh: 0.44, foot: 0.14, torsoR: 0.165, armR: 0.052, legR: 0.075 };
+  const BASE = B;
+  /* proporcje „klockowe” (głowa 8, tułów 12, ręce 12, nogi 12 pikseli) — dla postaci klockowych i skinów */
+  const BM = { hip: 0.675, spine: 0.675, neck: 0, headR: 0.225, shW: 0.3375, hipW: 0.1125, ua: 0.3375, fa: 0.3375, th: 0.3375, sh: 0.3375, foot: 0.1, torsoR: 0.225, armR: 0.1125, legR: 0.1125, shY: 0 };
   const mkArm = () => ({ p: 0.04, r: 0.1, e: 0.25, ik: null });
   const mkLeg = () => ({ p: 0, r: 0.03, k: 0.04 });
   const newPose = () => ({ yaw: 0, rootY: 0, rootZ: 0, air: 0, bp: 0, br: 0, lean: 0, twist: 0, roll: 0, hp: 0, hy: 0, hr: 0, L: mkArm(), R: mkArm(), LL: mkLeg(), RL: mkLeg(), mouth: 0, eyes: 'open', brow: 0, smile: 0.4, ball: null, sc: 1, flash: 0, hidden: false, prop: null });
@@ -38,7 +41,8 @@ const Anim = (() => {
     return [add(S, add(mul(u, a), mul(pv, hh))), add(S, mul(u, dist))];
   }
   /* wynik: stawy w świecie + dane głowy */
-  function solve(P, st) {
+  function solve(P, st, Bd) {
+    const B = Bd || BASE;
     const h = st.h + P.yaw, pel0 = [0, B.hip + P.rootY, P.rootZ];
     const body = (p) => { let q = sub(p, pel0); q = rx(rz(q, P.br), P.bp); q = add(q, pel0); q = ry(q, h); return [q[0] + st.x, q[1], q[2] + st.z]; };
     const tor = (p) => body(add(pel0, rz(rx(ry(p, P.twist), P.lean), P.roll)));
@@ -52,7 +56,7 @@ const Anim = (() => {
     J.hairBack = hd([0, hc + 0.02, -B.headR * 0.55]); J.top = hd([0, hc + B.headR * 0.95, 0]);
     J.sideR = nrm(sub(tor([-1, B.spine, 0]), tor([0, B.spine, 0])));
     for (const o of [1, -1]) {
-      const A = o > 0 ? P.L : P.R, S = [o * B.shW, B.spine - 0.05, 0], key = o > 0 ? 'L' : 'R';
+      const A = o > 0 ? P.L : P.R, S = [o * B.shW, B.spine - (B.shY == null ? 0.05 : B.shY), 0], key = o > 0 ? 'L' : 'R';
       let E = add(S, mul(dirPR(A.p, A.r, o), B.ua)), Wr = add(E, mul(dirPR(A.p + A.e, A.r * 0.85, o), B.fa));
       if (A.ik && A.ik.w > 0.001) {
         const [E2, W2] = ik2(S, toTorLocal(A.ik.t), B.ua, B.fa, A.ik.pole ? [A.ik.pole[0] * o, A.ik.pole[1], A.ik.pole[2]] : [o * 1, 0.25, -0.5]);
@@ -299,7 +303,7 @@ const Anim = (() => {
   }
   const sigOf = (sc) => JSON.stringify([sc.chars, sc.steps, sc.style, sc.bg, sc.cam]);
   function get(sc) { const sg = sigOf(sc); if (!sc._c || sc._sig !== sg) { Object.defineProperty(sc, '_c', { value: compile(sc), writable: true, enumerable: false, configurable: true }); Object.defineProperty(sc, '_sig', { value: sg, writable: true, enumerable: false, configurable: true }); } return sc._c; }
-  const duration = (sc) => MX(2, get(sc).end + 0.7);
+  const duration = (sc) => (sc.kind === 'motion' ? MX(0.5, sc.dur) : MX(2, get(sc).end + 0.7));
 
   /* stan postaci w czasie t */
   function evalChar(C, sc, i, t) {
@@ -409,7 +413,64 @@ const Anim = (() => {
   const BG_LIST = Object.keys(BGS);
 
   /* ---------- rysowanie postaci ---------- */
-  function buildParts(J, look, P) {
+  /* ---------- skiny (układ 64×64 jak w grach z klockami) ---------- */
+  const SKINS = new Map(), SK_TILE = (() => { try { return document.createElement('canvas'); } catch (e) { return null; } })();
+  const uvBox = (ox, oy, W, H, D) => ({ top: [ox + D, oy, W, D], bottom: [ox + D + W, oy, W, D], right: [ox, oy + D, D, H], front: [ox + D, oy + D, W, H], left: [ox + D + W, oy + D, D, H], back: [ox + 2 * D + W, oy + D, W, H] });
+  function skinPartsUV(slim) {
+    const aw = slim ? 3 : 4;
+    return { head: [uvBox(0, 0, 8, 8, 8), uvBox(32, 0, 8, 8, 8)], body: [uvBox(16, 16, 8, 12, 4), uvBox(16, 32, 8, 12, 4)], armR: [uvBox(40, 16, aw, 12, 4), uvBox(40, 32, aw, 12, 4)], armL: [uvBox(32, 48, aw, 12, 4), uvBox(48, 48, aw, 12, 4)], legR: [uvBox(0, 16, 4, 12, 4), uvBox(0, 32, 4, 12, 4)], legL: [uvBox(16, 48, 4, 12, 4), uvBox(0, 48, 4, 12, 4)] };
+  }
+  /* przygotowanie obrazu skina: normalizacja do 64×64 (stare skiny 64×32), wykrycie smukłych rąk */
+  function skinPrep(url) {
+    let sk = SKINS.get(url); if (sk) return sk;
+    sk = { ready: false, url, cv: null, slim: false, k: 1, avg: {} }; SKINS.set(url, sk);
+    if (typeof Image === 'undefined') return sk;
+    const img = new Image(); img.onload = () => {
+      try {
+        const k = MX(1, Math.round(img.width / 64)), cv = document.createElement('canvas'); cv.width = 64 * k; cv.height = 64 * k; const x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
+        x.drawImage(img, 0, 0, img.width, img.height > img.width * 0.75 ? img.height : img.height, 0, 0, 64 * k, img.height > img.width * 0.75 ? 64 * k : 32 * k);
+        if (img.height <= img.width * 0.75) {   /* 64×32: lustrzane odbicie prawych kończyn na lewe */
+          const flipBlock = (sx, sy, dx, dy, W, H, D) => { const parts = [['right', 'left'], ['front', 'front'], ['left', 'right'], ['back', 'back'], ['top', 'top'], ['bottom', 'bottom']], A = uvBox(sx, sy, W, H, D), Bx = uvBox(dx, dy, W, H, D); parts.forEach(([s0, d0]) => { const r = A[s0], t = Bx[d0]; x.save(); x.translate((t[0] + t[2]) * k, 0); x.scale(-1, 1); x.drawImage(cv, r[0] * k, r[1] * k, r[2] * k, r[3] * k, 0, t[1] * k, t[2] * k, t[3] * k); x.restore(); }); };
+          flipBlock(0, 16, 16, 48, 4, 12, 4); flipBlock(40, 16, 32, 48, 4, 12, 4);
+        }
+        sk.cv = cv; sk.k = k; sk.slim = x.getImageData(55 * k, 24 * k, 1, 1).data[3] === 0; sk.data = x.getImageData(0, 0, 64 * k, 64 * k); sk.ready = true;
+      } catch (e) { sk.ready = false; }
+    };
+    img.src = url; return sk;
+  }
+  const skinColor = (sk, x0, y0) => { const k = sk.k, i = ((Math.floor(y0 * k)) * 64 * k + Math.floor(x0 * k)) * 4, d = sk.data.data; return d[i + 3] < 8 ? '#888888' : `rgb(${d[i]},${d[i + 1]},${d[i + 2]})`; };
+  function skinTile(sk, r, shade) {
+    const [sx, sy, sw, sh] = r, k = sk.k, tw = MX(1, Math.round(sw * k)), th = MX(1, Math.round(sh * k)); SK_TILE.width = tw; SK_TILE.height = th; const t = SK_TILE.getContext('2d'); t.imageSmoothingEnabled = false;
+    t.clearRect(0, 0, tw, th); t.drawImage(sk.cv, Math.round(sx * k), Math.round(sy * k), tw, th, 0, 0, tw, th);
+    if (shade < 0.999) { t.globalCompositeOperation = 'source-atop'; t.fillStyle = `rgba(0,0,0,${(1 - shade).toFixed(3)})`; t.fillRect(0, 0, tw, th); t.globalCompositeOperation = 'source-over'; }
+    return SK_TILE;
+  }
+  /* uproszczone, własne wzory w układzie skina (do użycia bez internetu): „steve” i „alex” */
+  function proceduralSkin(kind) {
+    const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64; const x = cv.getContext('2d'), alex = kind === 'alex';
+    const C = alex ? { skin: '#e6b895', hair: '#c9742b', hair2: '#b0601f', shirt: '#6dbb5f', shirt2: '#5aa24e', pants: '#6a4a2c', shoe: '#3b2a1a', eye: '#2d6a3a' } : { skin: '#c4916b', hair: '#4a3220', hair2: '#3a2616', shirt: '#2aa7a7', shirt2: '#1f8f8f', pants: '#3a3a9c', shoe: '#6f6f72', eye: '#3b2a8f' };
+    const fill = (r, c) => { x.fillStyle = c; x.fillRect(r[0], r[1], r[2], r[3]); }, U = skinPartsUV(alex);
+    const pixel = (r, px, py, c) => { x.fillStyle = c; x.fillRect(r[0] + px, r[1] + py, 1, 1); };
+    /* głowa */
+    const H = U.head[0]; ['top', 'right', 'left', 'back'].forEach((f) => fill(H[f], C.hair)); fill(H.bottom, C.skin); fill(H.front, C.skin);
+    ['right', 'left'].forEach((f) => { x.fillStyle = C.skin; x.fillRect(H[f][0] + 1, H[f][1] + 3, 6, 5); }); if (alex) ['back', 'right', 'left'].forEach((f) => fill([H[f][0], H[f][1] + 3, H[f][2], 5], C.hair2));
+    fill([H.front[0], H.front[1], 8, 2], C.hair); [[0, 2], [7, 2]].forEach(([px, py]) => pixel(H.front, px, py, C.hair)); if (alex) { pixel(H.front, 0, 3, C.hair); pixel(H.front, 7, 3, C.hair); }
+    [[1, 4], [2, 4], [5, 4], [6, 4]].forEach(([px, py]) => pixel(H.front, px, py, '#f4f4f4')); [[2, 4], [5, 4]].forEach(([px, py]) => pixel(H.front, px, py, C.eye)); pixel(H.front, 1, 4, '#ffffff'); pixel(H.front, 6, 4, '#ffffff');
+    [[3, 5], [4, 5]].forEach(([px, py]) => pixel(H.front, px, py, alex ? '#c99a78' : '#9c6e50')); [[2, 6], [3, 6], [4, 6], [5, 6]].forEach(([px, py]) => pixel(H.front, px, py, alex ? '#a86a58' : '#6a3d2a'));
+    /* tułów */
+    const Bd = U.body[0]; ['front', 'back', 'right', 'left'].forEach((f) => fill(Bd[f], C.shirt)); fill(Bd.top, C.skin); fill(Bd.bottom, C.pants); fill([Bd.front[0] + 3, Bd.front[1], 2, 1], C.skin); fill([Bd.front[0], Bd.front[1] + 10, 8, 2], C.shirt2);
+    /* ręce: rękaw na górze, odkryta skóra niżej */
+    for (const part of ['armR', 'armL']) { const A = U[part][0]; ['front', 'back', 'right', 'left'].forEach((f) => { fill(A[f], C.skin); fill([A[f][0], A[f][1], A[f][2], 4], C.shirt); }); fill(A.top, C.shirt); fill(A.bottom, C.skin); }
+    /* nogi: spodnie + buty */
+    for (const part of ['legR', 'legL']) { const L = U[part][0]; ['front', 'back', 'right', 'left'].forEach((f) => { fill(L[f], C.pants); fill([L[f][0], L[f][1] + 10, L[f][2], 2], C.shoe); }); fill(L.top, C.pants); fill(L.bottom, C.shoe); }
+    return cv.toDataURL('image/png');
+  }
+  const PROC_SKINS = {};
+  const proceduralSkinURL = (kind) => PROC_SKINS[kind] || (PROC_SKINS[kind] = proceduralSkin(kind));
+
+  /* jeden prostopadłościan (część ciała) z ewentualną teksturą skina */
+  function buildParts(J, look, P, Bd) {
+    const B = Bd || BASE;
     if (P.hidden) return [];
     const r = B, c = look, rob = c.hs === 'robot', blk = c.model === 'block', F = P.flash || 0, S = P.sc || 1, parts = [];
     const fc = (col) => (F > 0.01 ? mixc(col, '#ffffff', F) : col);
@@ -419,18 +480,39 @@ const Anim = (() => {
     const box = (a, b, w, d, col, tag, side) => parts.push({ t: 'b', a: a.slice(), b: b.slice(), w: w * S, d: d * S, r: MX(w, d) * S, col, tag, side });
     if (blk) {
       const sd = J.sideR, ext = (a, b, k) => add(b, mul(nrm(sub(b, a)), k));
-      for (const k of ['L', 'R']) {
-        box(J['hp' + k], J['kn' + k], 0.088, 0.088, pa, 'leg', sd); box(J['kn' + k], J['an' + k], 0.082, 0.082, pa, 'leg', sd); box(J['an' + k], J['to' + k], 0.075, 0.055, shoe, 'foot', sd);
-        box(J['sh' + k], J['el' + k], 0.07, 0.07, sh, 'arm', sd); box(J['el' + k], J['wr' + k], 0.066, 0.066, skin, 'arm', sd); box(J['wr' + k], ext(J['el' + k], J['wr' + k], 0.08), 0.065, 0.065, hand, 'hand', sd);
+      const sk = c.skinTex ? skinPrep(c.skinTex) : null, skOK = !!(sk && sk.ready), slim = skOK && (c.slim != null ? !!c.slim : sk.slim), UV = skOK ? skinPartsUV(slim) : null;
+      const aw = slim ? B.armR * 0.75 : B.armR;
+      /* część ciała jako prostopadłościan; przy skinie dodaje też nakładkę (druga warstwa) */
+      const seg = (key, ja, jb, w, d, col, tag, rows, upIsB, side) => {
+        const o = { t: 'b', a: ja.slice(), b: jb.slice(), w: w * S, d: d * S, r: MX(w, d) * S, col, tag, side: side || sd };
+        if (skOK) {
+          const f = UV[key][0].front, ry = f[1] + f[3] * (rows[0] + rows[1]) / 2;
+          Object.assign(o, { sk, mc: key, rows, upIsB, layer: 0, col: skinColor(sk, f[0] + f[2] / 2, ry), flash: F });
+          parts.push(o);
+          parts.push(Object.assign({}, o, { layer: 1, w: o.w * 1.09, d: o.d * 1.09, r: 0, a: o.a.slice(), b: o.b.slice() }));
+        } else parts.push(o);
+      };
+      if (skOK) {
+        for (const k of ['L', 'R']) {
+          seg('leg' + k, J['hp' + k], J['kn' + k], r.legR, r.legR, pa, 'leg', [0, 0.5], false); seg('leg' + k, J['kn' + k], J['an' + k], r.legR, r.legR, pa, 'leg', [0.5, 1], false);
+          seg('arm' + k, J['sh' + k], J['el' + k], aw, r.armR, sh, 'arm', [0, 0.5], false); seg('arm' + k, J['el' + k], J['wr' + k], aw, r.armR, sh, 'arm', [0.5, 1], false);
+        }
+        seg('body', J.pel, J.chest, r.torsoR, r.torsoR * 0.5, sh, 'torso', [0, 1], true);
+        seg('head', sub(J.head, mul(J.up, r.headR)), add(J.head, mul(J.up, r.headR)), r.headR, r.headR, skin, 'head', [0, 1], true, J.rgt);
+      } else {
+        for (const k of ['L', 'R']) {
+          box(J['hp' + k], J['kn' + k], r.legR, r.legR, pa, 'leg', sd); box(J['kn' + k], J['an' + k], r.legR * 0.95, r.legR * 0.95, pa, 'leg', sd); box(J['an' + k], J['to' + k], r.legR * 0.9, r.legR * 0.55, shoe, 'foot', sd);
+          box(J['sh' + k], J['el' + k], r.armR, r.armR, sh, 'arm', sd); box(J['el' + k], J['wr' + k], r.armR * 0.95, r.armR * 0.95, skin, 'arm', sd); box(J['wr' + k], ext(J['el' + k], J['wr' + k], r.armR * 0.7), r.armR * 0.9, r.armR * 0.9, hand, 'hand', sd);
+        }
+        box(J.pel, J.chest, r.torsoR, r.torsoR * 0.5, sh, 'torso', sd); box(J.pel, mix3(J.pel, J.chest, 0.3), r.torsoR * 1.02, r.torsoR * 0.52, pa, 'hips', sd);
+        const hr = r.headR, hc = J.head, up = J.up, fw = J.fwd, rg = J.rgt;
+        box(sub(hc, mul(up, hr)), add(hc, mul(up, hr)), hr, hr, skin, 'head', rg);
+        const hair = fc(c.hair);
+        if (c.hs === 'short' || c.hs === 'long' || c.hs === 'bun') { box(add(hc, mul(up, hr * 0.6)), add(hc, mul(up, hr * 1.1)), hr * 1.07, hr * 1.07, hair, 'hair', rg); box(sub(add(hc, mul(up, hr * 0.5)), mul(fw, hr * 0.82)), sub(add(hc, mul(up, hr * 0.6 - (c.hs === 'long' ? 1.7 * hr : 0.6 * hr))), mul(fw, hr * 0.82)), hr * 1.05, hr * 0.3, hair, 'hair', rg); }
+        if (c.hs === 'bun') box(add(hc, mul(up, hr * 1.1)), add(hc, mul(up, hr * 1.6)), hr * 0.4, hr * 0.4, hair, 'hair', rg);
+        if (c.hs === 'cap') { const cc = fc('#e53935'); box(add(hc, mul(up, hr * 0.55)), add(hc, mul(up, hr * 1.1)), hr * 1.08, hr * 1.08, cc, 'hair', rg); box(add(add(hc, mul(up, hr * 0.55)), mul(fw, hr * 0.95)), add(add(hc, mul(up, hr * 0.7)), mul(fw, hr * 1.9)), hr * 0.95, hr * 0.12, fc('#b71c1c'), 'hair', rg); }
+        if (rob) { box(add(hc, mul(up, hr)), add(hc, mul(up, hr * 1.9)), hr * 0.08, hr * 0.08, '#94a3b8', 'hair', rg); box(add(hc, mul(up, hr * 1.9)), add(hc, mul(up, hr * 2.2)), hr * 0.16, hr * 0.16, '#ef4444', 'hair', rg); }
       }
-      box(J.pel, J.chest, 0.2, 0.115, sh, 'torso', sd); box(J.pel, mix3(J.pel, J.chest, 0.3), 0.205, 0.12, pa, 'hips', sd);
-      const hr = r.headR * 1.02, hc = J.head, up = J.up, fw = J.fwd, rg = J.rgt;
-      box(sub(hc, mul(up, hr)), add(hc, mul(up, hr)), hr, hr, skin, 'head', rg);
-      const hair = fc(c.hair);
-      if (c.hs === 'short' || c.hs === 'long' || c.hs === 'bun') { box(add(hc, mul(up, hr * 0.6)), add(hc, mul(up, hr * 1.1)), hr * 1.07, hr * 1.07, hair, 'hair', rg); box(sub(add(hc, mul(up, hr * 0.5)), mul(fw, hr * 0.82)), sub(add(hc, mul(up, hr * 0.6 - (c.hs === 'long' ? 1.7 * hr : 0.6 * hr))), mul(fw, hr * 0.82)), hr * 1.05, hr * 0.3, hair, 'hair', rg); }
-      if (c.hs === 'bun') box(add(hc, mul(up, hr * 1.1)), add(hc, mul(up, hr * 1.6)), hr * 0.4, hr * 0.4, hair, 'hair', rg);
-      if (c.hs === 'cap') { const cc = fc('#e53935'); box(add(hc, mul(up, hr * 0.55)), add(hc, mul(up, hr * 1.1)), hr * 1.08, hr * 1.08, cc, 'hair', rg); box(add(add(hc, mul(up, hr * 0.55)), mul(fw, hr * 0.95)), add(add(hc, mul(up, hr * 0.7)), mul(fw, hr * 1.9)), hr * 0.95, hr * 0.12, fc('#b71c1c'), 'hair', rg); }
-      if (rob) { box(add(hc, mul(up, hr)), add(hc, mul(up, hr * 1.9)), hr * 0.08, hr * 0.08, '#94a3b8', 'hair', rg); box(add(hc, mul(up, hr * 1.9)), add(hc, mul(up, hr * 2.2)), hr * 0.16, hr * 0.16, '#ef4444', 'hair', rg); }
     } else {
       for (const k of ['L', 'R']) {
         cap(J['hp' + k], J['kn' + k], r.legR + 0.01, pa); cap(J['kn' + k], J['an' + k], r.legR, pa); cap(J['an' + k], J['to' + k], 0.065, shoe);
@@ -450,40 +532,72 @@ const Anim = (() => {
     return parts;
   }
   const mix3 = (a, b, k) => lerp3(a, b, k);
-  function drawChar(x, cam, i, ev, look, sc, J, P) {
-    const parts = buildParts(J, look, P), flat = sc.style === '2d';
-    return { parts, J, P, look, flat, ev, i };
+  function drawChar(x, cam, i, ev, look, sc, J, P, D) {
+    const parts = buildParts(J, look, P, D), flat = sc.style === '2d';
+    return { parts, J, P, look, flat, ev, i, D, skinned: parts.some((p) => p.sk) };
+  }
+  /* ramka prostopadłościanu: oś, bok (prawa strona postaci) i głębokość */
+  function boxFrame(p, J) {
+    let u = sub(p.b, p.a); const L = len(u); u = L < 1e-5 ? [0, 1, 0] : mul(u, 1 / L);
+    let sd = p.side || J.sideR; sd = sub(sd, mul(u, dot(sd, u))); sd = len(sd) < 1e-4 ? nrm(cross(u, [0, 0, 1])) : nrm(sd);
+    return { u, sd, td: nrm(cross(u, sd)), L };
   }
   function groundShift(items) {
     for (const it of items) {
-      let mnY = 1e9; for (const p of it.parts) mnY = MN(mnY, MN(p.a[1], p.b[1]) - p.r);
+      let mnY = 1e9;
+      for (const p of it.parts) {
+        if (p.layer) continue;
+        if (p.t === 'b') { const f = boxFrame(p, it.J), ey = abs(f.sd[1]) * p.w + abs(f.td[1]) * p.d; mnY = MN(mnY, MN(p.a[1], p.b[1]) - ey); } else mnY = MN(mnY, MN(p.a[1], p.b[1]) - p.r);
+      }
       const dy = -mnY + it.P.air; if (it.ev.noGround) continue;
-      it.parts.forEach((p) => { p.a[1] += dy; p.b[1] += dy; }); Object.values(it.J).forEach((v) => { if (Array.isArray(v) && v.length === 3 && v !== it.J.fwd && v !== it.J.up && v !== it.J.rgt) v[1] += dy; });
+      it.parts.forEach((p) => { p.a[1] += dy; p.b[1] += dy; }); Object.values(it.J).forEach((v) => { if (Array.isArray(v) && v.length === 3 && v !== it.J.fwd && v !== it.J.up && v !== it.J.rgt && v !== it.J.sideR) v[1] += dy; });
       it.dy = dy;
     }
   }
   const OUT = '#14121c';
   const LIGHT = nrm([-0.45, 0.85, 0.55]);
   function paintBox(x, cam, p, flat, it) {
-    let u = sub(p.b, p.a); const L = len(u); u = L < 1e-5 ? [0, 1, 0] : mul(u, 1 / L);
-    let sd = p.side || it.J.sideR; sd = sub(sd, mul(u, dot(sd, u))); sd = len(sd) < 1e-4 ? cross(u, [0, 0, 1]) : nrm(sd); const td = nrm(cross(u, sd));
-    const sx = mul(sd, p.w), ty = mul(td, p.d), C = [];
+    const { u, sd, td, L } = boxFrame(p, it.J), sx = mul(sd, p.w), ty = mul(td, p.d), C = [];
     for (const e of [p.a, p.b]) for (const a of [-1, 1]) for (const b of [-1, 1]) C.push(add(e, add(mul(sx, a), mul(ty, b))));
-    /* indeksy: [e][a][b] => e*4 + (a>0)*2 + (b>0) */
     const I = (e, a, b) => e * 4 + (a > 0 ? 2 : 0) + (b > 0 ? 1 : 0), cen = lerp3(p.a, p.b, 0.5);
     const faces = [[[I(0, -1, -1), I(0, 1, -1), I(0, 1, 1), I(0, -1, 1)], mul(u, -1)], [[I(1, -1, -1), I(1, -1, 1), I(1, 1, 1), I(1, 1, -1)], u],
       [[I(0, -1, -1), I(1, -1, -1), I(1, 1, -1), I(0, 1, -1)], mul(td, -1)], [[I(0, -1, 1), I(0, 1, 1), I(1, 1, 1), I(1, -1, 1)], td],
       [[I(0, -1, -1), I(0, -1, 1), I(1, -1, 1), I(1, -1, -1)], mul(sd, -1)], [[I(0, 1, -1), I(1, 1, -1), I(1, 1, 1), I(0, 1, 1)], sd]];
-    const camPos = cam.three ? cam.pos : add(cen, [0, 0.4, 20]), pr = C.map((q) => cam.project(q)), rr = cam.rad(cen, 1), ow = MX(1.2, rr * 0.012);
-    const vis = faces.map(([idx, n]) => { const c0 = lerp3(C[idx[0]], C[idx[2]], 0.5); return [idx, n, dot(n, sub(camPos, c0)), dot(n, LIGHT)]; }).filter((f) => f[2] > 0).sort((a, b) => b[2] - a[2]);
+    const camPos = cam.three ? cam.pos : add(cen, [0, 0.4, 20]), pr = C.map((q) => cam.project(q)), rr = cam.rad(cen, 1), ow = MX(1, rr * 0.01);
+    const vis = faces.map(([idx, n], fi) => { const c0 = lerp3(C[idx[0]], C[idx[2]], 0.5); return [idx, n, dot(n, sub(camPos, c0)), dot(n, LIGHT), fi]; }).filter((f) => f[2] > 0).sort((a, b) => b[2] - a[2]);
     x.lineJoin = 'round';
-    vis.forEach(([idx, n, , lt]) => {
-      const f = flat ? 0.78 + 0.22 * MX(0, lt) : 0.5 + 0.5 * MX(0, lt);
+    const path = (idx) => { x.beginPath(); idx.forEach((k, i) => (i ? x.lineTo(pr[k][0], pr[k][1]) : x.moveTo(pr[k][0], pr[k][1]))); x.closePath(); };
+    /* semantyka stron dla skina: góra/dół/przód/tył/prawa/lewa */
+    let sem = null;
+    if (p.sk) {
+      const ub = p.upIsB, U = ub ? u : mul(u, -1), F = cross(U, sd), hL = L / 2, wR = p.w, dF = p.d;
+      sem = { [ub ? 1 : 0]: ['top', add(add(add(cen, mul(U, hL)), mul(sd, wR)), mul(F, -dF)), mul(sd, -1), F, 2 * wR, 2 * dF], [ub ? 0 : 1]: ['bottom', add(add(add(cen, mul(U, -hL)), mul(sd, wR)), mul(F, dF)), mul(sd, -1), mul(F, -1), 2 * wR, 2 * dF],
+        [ub ? 3 : 2]: ['front', add(add(add(cen, mul(F, dF)), mul(sd, wR)), mul(U, hL)), mul(sd, -1), mul(U, -1), 2 * wR, 2 * hL], [ub ? 2 : 3]: ['back', add(add(add(cen, mul(F, -dF)), mul(sd, -wR)), mul(U, hL)), sd, mul(U, -1), 2 * wR, 2 * hL],
+        5: ['right', add(add(add(cen, mul(sd, wR)), mul(F, -dF)), mul(U, hL)), F, mul(U, -1), 2 * dF, 2 * hL], 4: ['left', add(add(add(cen, mul(sd, -wR)), mul(F, dF)), mul(U, hL)), mul(F, -1), mul(U, -1), 2 * dF, 2 * hL] };
+    }
+    vis.forEach(([idx, n, , lt, fi]) => {
+      const f = flat ? 0.8 + 0.2 * MX(0, lt) : 0.52 + 0.48 * MX(0, lt);
+      if (p.sk && sem[fi]) {
+        const [face, O, uD, vD, Lu, Lv] = sem[fi], r0 = UV_CACHE[p.slim ? 1 : 0][p.mc][p.layer || 0][face].slice();
+        if (face !== 'top' && face !== 'bottom') { r0[1] += r0[3] * p.rows[0]; r0[3] = r0[3] * (p.rows[1] - p.rows[0]); }
+        const capOK = (face === 'top' && p.rows[0] === 0) || (face === 'bottom' && p.rows[1] === 1) || (face !== 'top' && face !== 'bottom');
+        if (!p.layer) { x.fillStyle = mixc(p.col, '#000000', 1 - MN(1, f)); path(idx); x.fill(); }
+        if (capOK) {
+          const P0 = cam.project(O), P1 = cam.project(add(O, mul(uD, Lu))), P2 = cam.project(add(O, mul(vD, Lv))), tl = skinTile(p.sk, r0, f), sw = tl.width, sh2 = tl.height;
+          x.save(); path(idx); x.clip(); x.imageSmoothingEnabled = false;
+          x.transform((P1[0] - P0[0]) / sw, (P1[1] - P0[1]) / sw, (P2[0] - P0[0]) / sh2, (P2[1] - P0[1]) / sh2, P0[0], P0[1]); x.drawImage(tl, 0, 0, sw, sh2);
+          if (p.flash > 0.01) { x.fillStyle = `rgba(255,255,255,${p.flash.toFixed(2)})`; x.fillRect(0, 0, sw, sh2); }
+          x.restore();
+        }
+        if (!p.layer) { x.strokeStyle = 'rgba(15,12,24,.55)'; x.lineWidth = ow; path(idx); x.stroke(); }
+        return;
+      }
       x.fillStyle = mixc(p.col, '#000000', 1 - MN(1, f)); x.strokeStyle = OUT; x.lineWidth = ow * 2;
-      x.beginPath(); idx.forEach((k, i) => (i ? x.lineTo(pr[k][0], pr[k][1]) : x.moveTo(pr[k][0], pr[k][1]))); x.closePath(); x.fill(); x.stroke();
-      if (!flat && lt > 0.5) { x.strokeStyle = 'rgba(255,255,255,.16)'; x.lineWidth = ow; x.beginPath(); idx.forEach((k, i) => (i ? x.lineTo(pr[k][0], pr[k][1]) : x.moveTo(pr[k][0], pr[k][1]))); x.closePath(); x.stroke(); }
+      path(idx); x.fill(); x.stroke();
+      if (!flat && lt > 0.5) { x.strokeStyle = 'rgba(255,255,255,.16)'; x.lineWidth = ow; path(idx); x.stroke(); }
     });
   }
+  const UV_CACHE = [skinPartsUV(false), skinPartsUV(true)].map((m) => { const o = {}; for (const k in m) o[k] = m[k]; return o; });
   function paintPart(x, cam, p, flat, W, it) {
     if (p.t === 'b') { paintBox(x, cam, p, flat, it); return; }
     const pa = cam.project(p.a), pb = cam.project(p.b), mid = lerp3(p.a, p.b, 0.5), pr = cam.rad(mid, p.r), ow = MX(1.2, pr * 0.16);
@@ -539,7 +653,7 @@ const Anim = (() => {
 
   function drawBlockFace(x, cam, it) {
     const { J, P, look } = it; if (P.hidden) return;
-    const hr = B.headR * 1.02, cdir = cam.three ? nrm(sub(cam.pos, J.head)) : [0, 0.1, 1], facing = dot(J.fwd, cdir); if (facing < 0.04) return;
+    const hr = (it.D || BASE).headR * 1.0 + 0.002, cdir = cam.three ? nrm(sub(cam.pos, J.head)) : [0, 0.1, 1], facing = dot(J.fwd, cdir); if (facing < 0.04) return;
     const F = add(J.head, mul(J.fwd, hr * 1.005)), q = (c, a, b) => cam.project(add(c, add(mul(J.rgt, a), mul(J.up, b)))), rob = look.hs === 'robot';
     const quad = (c, w, h, col) => { const p0 = q(c, -w, -h), p1 = q(c, w, -h), p2 = q(c, w, h), p3 = q(c, -w, h); x.fillStyle = col; x.beginPath(); x.moveTo(p0[0], p0[1]); x.lineTo(p1[0], p1[1]); x.lineTo(p2[0], p2[1]); x.lineTo(p3[0], p3[1]); x.closePath(); x.fill(); };
     const ew = hr * 0.17;
@@ -603,6 +717,7 @@ const Anim = (() => {
 
   /* ---------- rysowanie sceny ---------- */
   function draw(x, W, H, sc, t) {
+    if (sc.kind === 'motion') { Motion.draw(x, W, H, sc, t); return; }
     const C = get(sc), cam = camera(sc, C, t, W, H), bg = BGS[sc.bg] || BGS.park, hz = cam.hz;
     x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; x.filter = 'none'; x.shadowBlur = 0;
     grad(x, W, 0, hz, bg.sky); x.fillRect(0, 0, W, MX(hz, 0) + 1);
@@ -615,17 +730,17 @@ const Anim = (() => {
       for (let gx = gx0 - 24; gx <= gx0 + 24; gx += 2) { const a = cam.project([gx, 0, -16]), b = cam.project([gx, 0, 14]); if (a[2] > 0.3 && b[2] > 0.3) { x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke(); } else { const b2 = cam.project([gx, 0, MN(14, -16 + (14 + 16) * 0.55)]); x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b2[0], b2[1]); x.stroke(); } }
     } else { for (let k = 1; k <= 4; k++) { const y = hz + (H - hz) * (k / 5) ** 1.5; x.beginPath(); x.moveTo(0, y); x.lineTo(W, y); x.stroke(); } }
     const items = sc.chars.map((ch, i) => {
-      const ev = evalChar(C, sc, i, t), J = solve(ev.P, ev), look = ch.type === 'robot' ? Object.assign({}, ROBOT, ch, { hs: 'robot' }) : ch;
-      const it = drawChar(x, cam, i, ev, look, sc, J, ev.P); it.h = ev.h; return it;
+      const ev = evalChar(C, sc, i, t), D = ch.model === 'block' ? BM : BASE, J = solve(ev.P, ev, D), look = ch.type === 'robot' ? Object.assign({}, ROBOT, ch, { hs: 'robot' }) : ch;
+      const it = drawChar(x, cam, i, ev, look, sc, J, ev.P, D); it.h = ev.h; return it;
     });
     groundShift(items);
     /* cienie */
     items.forEach((it) => { if (it.P.hidden) return; const g = cam.project([it.J.pel[0], 0, it.J.pel[2]]), r = cam.rad([it.J.pel[0], 0, it.J.pel[2]], 0.45) * (1 - MN(0.5, it.P.air * 0.4)); x.fillStyle = 'rgba(0,0,0,' + (0.3 - MN(0.18, it.P.air * 0.2)).toFixed(3) + ')'; x.beginPath(); x.ellipse(g[0], g[1], r, r * (cam.three ? 0.32 : 0.22), 0, 0, 7); x.fill(); });
     /* krzesła pod postaciami (wymagają pozycji) rysowane jako efekty „chair” przed częściami */
     C.fx.filter((e) => e.k === 'chair' && t >= e.t && items[e.who] && items[e.who].ev.seg && items[e.who].ev.seg.act === 'sit').forEach((e) => fxDraw(x, cam, e, 0, t, items, W, H));
-    const all = []; items.forEach((it) => it.parts.forEach((p) => all.push({ it, p, d: cam.project(lerp3(p.a, p.b, 0.5))[2] + (p.tag === 'hairback' ? 0.05 : 0) + (p.tag === 'head' ? -0.02 : 0) })));
+    const all = []; items.forEach((it) => it.parts.forEach((p) => all.push({ it, p, d: cam.project(lerp3(p.a, p.b, 0.5))[2] + (p.tag === 'hairback' ? 0.05 : 0) + (p.tag === 'head' ? -0.02 : 0) - (p.layer ? 0.004 : 0) })));
     all.sort((a, b) => b.d - a.d);
-    all.forEach(({ it, p }) => { paintPart(x, cam, p, it.flat, W, it); if (p.tag === 'head') (it.look.model === 'block' ? drawBlockFace : drawHeadExtras)(x, cam, it); });
+    all.forEach(({ it, p }) => { paintPart(x, cam, p, it.flat, W, it); if (p.tag === 'head' && !p.layer && !p.sk) (it.look.model === 'block' ? drawBlockFace : drawHeadExtras)(x, cam, it); });
     items.forEach((it) => { if (it.P.ball) { const q = it.J[it.P.ball.hand], bp = cam.project(q), r = cam.rad(q, 0.11); x.fillStyle = '#fff'; x.strokeStyle = OUT; x.lineWidth = 2; x.beginPath(); x.arc(bp[0], bp[1] - r, r, 0, 7); x.fill(); x.stroke(); } });
     C.fx.forEach((e) => { if (e.k === 'chair') return; if (t >= e.t && t <= e.t + e.d) fxDraw(x, cam, e, cl((t - e.t) / MX(0.01, MN(e.d, 50)), 0, 1), t, items, W, H); });
     x.restore();
@@ -637,10 +752,10 @@ const Anim = (() => {
     if (!o || typeof o !== 'object') return null;
     const n = cl(Array.isArray(o.chars) ? o.chars.length : (fallbackN || 1), 1, 4), sc = newScene({ n });
     sc.style = o.style === '2d' ? '2d' : '3d'; sc.bg = BGS[o.bg] ? o.bg : 'park'; sc.cam = ['auto', 'wide', 'close'].includes(o.cam) ? o.cam : 'auto'; sc.prompt = String(o.prompt || '').slice(0, 800);
-    if (Array.isArray(o.chars)) o.chars.slice(0, 4).forEach((c, i) => { if (!c) return; const d = sc.chars[i], col = (v, dv) => (/^#[0-9a-f]{6}$/i.test(v) ? v : dv); Object.assign(d, { name: String(c.name || d.name).slice(0, 24), type: c.type === 'robot' ? 'robot' : 'human', skin: col(c.skin, d.skin), shirt: col(c.shirt, d.shirt), pants: col(c.pants, d.pants), hair: col(c.hair, d.hair), hs: ['short', 'long', 'bun', 'cap', 'none'].includes(c.hs) ? c.hs : d.hs, model: c.model === 'block' ? 'block' : 'round' }); });
+    if (Array.isArray(o.chars)) o.chars.slice(0, 4).forEach((c, i) => { if (!c) return; const d = sc.chars[i], col = (v, dv) => (/^#[0-9a-f]{6}$/i.test(v) ? v : dv); Object.assign(d, { name: String(c.name || d.name).slice(0, 24), type: c.type === 'robot' ? 'robot' : 'human', skin: col(c.skin, d.skin), shirt: col(c.shirt, d.shirt), pants: col(c.pants, d.pants), hair: col(c.hair, d.hair), hs: ['short', 'long', 'bun', 'cap', 'none'].includes(c.hs) ? c.hs : d.hs, model: c.model === 'block' || c.mcSkin ? 'block' : 'round', skinName: c.mcSkin ? String(c.mcSkin).replace(/[^A-Za-z0-9_]/g, '').slice(0, 16) : undefined, slim: c.slim === true ? true : undefined }); });
     const ids = sc.chars.map((c) => c.id);
     sc.steps = (Array.isArray(o.steps) ? o.steps : []).slice(0, 80).map((s) => ({ at: cl(+s.at || 0, 0, 120), dur: s.dur > 0 ? cl(+s.dur, 0.2, 15) : 0, who: ids.includes(s.who) ? s.who : ids[0], act: ACTS[s.act] ? s.act : 'idle', target: ids.includes(s.target) ? s.target : null, text: s.text ? String(s.text).slice(0, 60) : '', gap: s.gap > 0 ? cl(+s.gap, 0.3, 4) : 0, name: s.n ? String(s.n).slice(0, 30) : undefined, keys: s.act === 'custom' ? sanKeys(s.keys) : undefined }));
     return sc;
   }
-  return { ACTS, ACT_LIST, HIT_ACTS, BGS, BG_LIST, LOOKS, ROBOT, newScene, sanKeys, compile: get, duration, draw, sanitize, startPos, speedOf, DEF };
+  return { ACTS, ACT_LIST, HIT_ACTS, BGS, BG_LIST, LOOKS, ROBOT, newScene, sanKeys, skinPrep, proceduralSkinURL, compile: get, duration, draw, sanitize, startPos, speedOf, DEF };
 })();
