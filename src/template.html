@@ -1,0 +1,56 @@
+<title>Kadr Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&family=Anton&family=Bebas+Neue&family=Montserrat:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Pacifico&family=Permanent+Marker&family=Righteous&family=Caveat:wght@400;700&family=Lobster&family=Space+Grotesk:wght@400;700&display=swap">
+<style>
+<!--STYLE-->
+</style>
+
+<div id="app" data-tab="media">
+  <header class="top">
+    <div class="brand">
+      <svg class="logo" width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="8" fill="var(--acc)"/><path d="M9 11.5h3v9H9zM14.5 8.5h3v15h-3zM20 11.5h3v9h-3z" fill="#fff"/></svg>
+      <b>Kadr Studio</b>
+    </div>
+    <button id="projBtn" class="proj" title="Ustawienia filmu">Mój film</button>
+    <span id="demoChip" class="chipdemo" hidden>Projekt przykładowy</span>
+    <span class="grow"></span>
+    <button id="installBtn" class="btn sm" hidden>Zainstaluj aplikację</button>
+    <button id="newBtn" class="btn sm">Nowy<span class="long">&nbsp;projekt</span></button>
+    <button id="expBtn" class="btn primary">Eksportuj</button>
+  </header>
+
+  <main class="work">
+    <nav id="rail" class="rail" aria-label="Narzędzia"></nav>
+    <section id="panel" class="panel" aria-live="polite"></section>
+    <section class="stage">
+      <div id="stageBox" class="stage-box"><div id="stageHost" class="stage-host"></div></div>
+      <div class="transport">
+        <span class="time"><b id="timeNow">00:00.00</b><i>/</i><span id="timeTotal">00:00.00</span></span>
+        <div class="tmid">
+          <button class="tb" id="bBack" title="Na początek (Home)"></button>
+          <button class="tb" id="bFrameL" title="Klatka wstecz (←)"></button>
+          <button class="tb play" id="bPlay" title="Odtwórz (spacja)"></button>
+          <button class="tb" id="bFrameR" title="Klatka w przód (→)"></button>
+          <button class="tb" id="bFwd" title="Na koniec (End)"></button>
+        </div>
+        <div class="tend">
+          <select id="aspSel" title="Proporcje filmu" aria-label="Proporcje filmu"></select>
+          <button class="tb" id="bFull" title="Pełny ekran"></button>
+        </div>
+      </div>
+    </section>
+    <aside id="inspector" class="inspector" aria-label="Właściwości"></aside>
+  </main>
+
+  <section id="timeline" class="timeline" aria-label="Oś czasu"></section>
+</div>
+
+<div id="modal" class="modal" hidden></div>
+<div id="dropOv" class="dropov" hidden><div>Upuść pliki, aby zaimportować</div></div>
+<div id="toast" role="status"></div>
+
+<script src="lib/mp4-muxer.js"></script>
+<script src="lib/webm-muxer.js"></script>
+<script>
+<!--SCRIPT-->
+</script>

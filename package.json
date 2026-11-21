@@ -1,0 +1,49 @@
+{
+  "name": "kadr-studio",
+  "version": "1.0.0",
+  "description": "Kadr Studio – edytor wideo: efekty, przejścia, animacje, usuwanie tła, eksport MP4",
+  "main": "electron/main.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "node build.js",
+    "serve": "node build.js && node electron/serve.js",
+    "start": "node build.js && electron .",
+    "dist": "node build.js && electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "pl.kadrstudio.app",
+    "productName": "Kadr Studio",
+    "files": [
+      "dist/**/*",
+      "!dist/artifact.html",
+      "electron/**/*",
+      "icons/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.video"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "AudioVideo"
+    },
+    "directories": {
+      "output": "release"
+    },
+    "icon": "icons/icon-512.png"
+  },
+  "author": "Kadr Studio",
+  "homepage": "https://github.com/maxioo21/fake-tt",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maxioo21/fake-tt.git"
+  }
+}
