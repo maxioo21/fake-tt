@@ -468,7 +468,7 @@ const UI = {
   toolAssistant(box) {
     this.toolBack(box, 'Asystent Claude');
     const st = this._as || (this._as = { topic: '', kind: 'captions', items: null, busy: false, msg: '' });
-    box.append(F.hint('Opisz film, a Claude zaproponuje napisy na ekran, hasztagi lub opis posta. Zużywa Twój limit Claude.'));
+    box.append(F.hint('Opisz film, a AI zaproponuje napisy na ekran, hasztagi lub opis posta. Domyślnie korzysta z Claude (zużywa Twój limit). Aby tego uniknąć, podłącz darmowy model (Ollama, Gemini…) w zakładce AI → Ustawienia AI.'));
     const ta = h('textarea', { rows: 3, placeholder: 'O czym jest film? np. „Weekend w Tatrach, wschód słońca nad Morskim Okiem”', oninput: (e) => { st.topic = e.target.value; } }, st.topic);
     const sel = h('select', { onchange: (e) => { st.kind = e.target.value; } }, [['captions', 'Napisy na ekran (krótkie hasła)'], ['hook', 'Pomysły na początek filmu (hook)'], ['post', 'Opis posta + hasztagi']].map(([v, t]) => h('option', { value: v, selected: v === st.kind }, t)));
     box.append(ta, sel, F.btn(st.busy ? 'Claude myśli…' : 'Generuj', () => Tools.assist(), 'primary block', 'sparkles'));

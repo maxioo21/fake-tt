@@ -357,3 +357,18 @@ body.dnd, body.dnd * { cursor: grabbing !important; user-select: none !important
 .tplcard .btn { padding: 6px 10px; }
 textarea.lyr { width: 100%; resize: vertical; min-height: 120px; font-size: 13px; line-height: 1.5; }
 @media (max-width: 520px) { .tplcard { grid-template-columns: 104px minmax(0, 1fr); } .tplcard .tile { width: 104px; } }
+
+.clip.scene { background: linear-gradient(90deg, #2f6fdd, #19b3a6); }
+
+/* ---------- AI Studio ---------- */
+.aiprev { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line2); background: #000; display: block; }
+.card2 .steps { margin: 0; padding-left: 18px; color: var(--mut); font-size: 12px; line-height: 1.55; }
+.card2 .steps b { color: var(--fg); }
+.chips.ex { gap: 5px; } .chips.ex .chip { text-align: left; font-size: 11.5px; padding: 4px 9px; }
+.aiform { display: flex; flex-direction: column; gap: 8px; }
+.steps2 { display: flex; flex-direction: column; gap: 8px; }
+.strow { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 10px; background: var(--panel2); border: 1px solid var(--line); }
+.strow .r1, .strow .r2 { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.strow .r2 label { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 11.5px; }
+.strow input[type=number] { width: 58px; padding: 5px 6px; border-radius: 7px; border: 1px solid var(--line2); background: var(--bg); color: var(--fg); }
+select.mini { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line2); background: var(--bg); color: var(--fg); font-size: 12px; min-width: 0; max-width: 100%; }

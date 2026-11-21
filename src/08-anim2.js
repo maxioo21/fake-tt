@@ -1,0 +1,314 @@
+'use strict';
+/* ============================================================
+   Kadr Animator — planer (opis po polsku → scenariusz), łączniki do dowolnego AI (opcjonalnie),
+   panel „AI” w lewym menu i edytor sceny w inspektorze.
+   Domyślnie wszystko działa lokalnie i za darmo (bez Claude i bez kredytów).
+   ============================================================ */
+const Planner = (() => {
+  const nz = (s) => String(s || '').toLowerCase().replace(/ł/g, 'l').normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const VERBS = [
+    ['slap', /(z liscia|liscia|policzk\w*|spoliczk\w*|plaskacz\w*|z plaska)/], ['kick', /\b(kopn\w*|kopi\w*|kopie|kopa\w*|kopniak\w*)\b/],
+    ['punch', /\b(uderz\w*|bije|bij\w*|wali|przywal\w*|lupi|tlucze|boksuj\w*|pieszcz\w*|cios\w*)\b/], ['push', /\b(pchn\w*|popchn\w*|pcha|popycha\w*|odpycha\w*)\b/],
+    ['hug', /\b(przytul\w*|obejm\w*|usciska\w*|usciski)\b/], ['kiss', /\b(calu\w*|buziak\w*|buzi\w*)\b/], ['throw', /\b(rzuc\w*|wyrzuc\w*|rzut\w*|pilk\w*)\b/],
+    ['approach', /\b(podchodz\w*|podejdz\w*|zbliza\w*|zblizy\w*|nadchodzi)\b/], ['runto', /\b(podbieg\w*|dobieg\w*)\b/], ['flee', /\b(ucieka\w*|uciek\w*|zwiewa\w*)\b/],
+    ['run', /\b(biegn\w*|biega\w*|pedz\w*|sprint\w*)\b/], ['walk', /\b(idzie|ida|chodzi|chodza|spacerowa\w*|spaceruj\w*|maszeruj\w*|kroczy|przechodzi)\b/],
+    ['jump', /\b(skacz\w*|skok\w*|podskakuj\w*|podskoczy\w*|hopsa\w*)\b/], ['flip', /\b(salto\w*|fikolek\w*|backflip\w*|fika\w*|koziolek\w*)\b/],
+    ['spin', /\b(krec\w* sie|obraca\w* sie|wiruj\w*|piruet\w*)\b/], ['wave', /\b(macha\w*|machn\w*|wita\w*|pozdrawi\w*|zegna\w*)\b/],
+    ['dance', /\b(tancz\w*|taniec|tanczy|tanc\w*)\b/], ['clap', /\b(klaszcz\w*|oklask\w*|brawa)\b/], ['laugh', /\b(smie\w*|smiej\w*|smiech\w*|chichocz\w*|rechocz\w*|parska\w*)\b/],
+    ['cry', /\b(placz\w*|rozplak\w*|lzy|szlocha\w*|lkaj\w*)\b/], ['angry', /\b(zlosci\w*|wsciek\w*|zly|zla|gniewa\w*|irytuj\w*|denerwuj\w*)\b/],
+    ['sit', /\b(siada\w*|usiad\w*|siedzi\w*)\b/], ['sleep', /\b(spi|spia|zasyp\w*|zasn\w*|drzem\w*)\b/], ['fall', /\b(upada\w*|przewraca\w*|pada|padaj\w*|wywraca\w*|potyka\w*|przewroci\w*)\b/],
+    ['getup', /\b(wstaje|wstan\w*|podnosi sie)\b/], ['point', /\b(wskazuje|wskaz\w*|pokazuje palcem)\b/], ['nod', /\b(kiwa\w*|przytak\w*|zgadza sie)\b/],
+    ['shake', /\b(kreci glowa|przeczy|zaprzecza)\b/], ['bow', /\b(klania sie|uklon\w*)\b/], ['celebrate', /\b(swietuj\w*|cieszy\w*|raduj\w*|triumf\w*|wiwat\w*|wygryw\w*|wygral\w*|zwyciez\w*)\b/],
+    ['think', /\b(mysli|mysla|zastanawia\w*|medytuj\w*|rozmysla\w*)\b/], ['shout', /\b(krzycz\w*|krzyk\w*|wrzesz\w*|wola)\b/], ['shrug', /\b(wzrusz\w*|nie wie)\b/],
+    ['facepalm', /\b(facepalm|lapie sie za glowe|dlon w twarz|zaslania twarz)\b/], ['scared', /\b(boi sie|przestraszy\w*|przerazi\w*|drzy|przerazon\w*|straszy\w*|wystraszy\w*)\b/],
+    ['say', /\b(mowi\w*|powiedz\w*|odpowiad\w*|pyta\w*|szepcze|rozmawia\w*|gada\w*|opowiad\w*)\b/], ['look', /\b(patrzy\w*|spoglada\w*|obserwuj\w*|gapi\w*|wpatruj\w*)\b/],
+    ['turn', /\b(odwraca\w*|obroc\w*|odwroci\w*)\b/], ['idle', /\b(stoi\w*|czeka\w*|stoja)\b/],
+  ];
+  const BGKEY = [['beach', /plaz|morz|ocean|wakacj/], ['night', /\bnoc\w*|nocy|ksiezyc/], ['sunset', /zachod\w* slonca|zachod|zmierzch|wschod/], ['street', /\bulic\w*|miast\w*|chodnik/], ['room', /pokoj|\bdom\b|\bdomu\b|mieszkan|salon|kuchni/],
+    ['stadium', /stadion|boisk|mecz|pilkars|\bgol\b/], ['space', /kosmos|kosmicz|planet/], ['snow', /snieg|\bzim[aeoy]\b|zimow/], ['studio', /studio|neutraln|bialym tle/], ['park', /\bpark\w*|trawa|\blak\w*|\blas\w*/]];
+  const findVerbs = (cl) => {
+    const found = [];
+    VERBS.forEach(([act, re]) => { const g = new RegExp(re.source, 'g'); let m; while ((m = g.exec(cl))) { found.push({ act, idx: m.index, end: m.index + m[0].length }); if (m.index === g.lastIndex) g.lastIndex++; } });
+    let out = found.filter((v) => !(v.act === 'punch' && found.some((o) => o.act === 'slap' && o.idx >= v.idx && o.idx - v.idx < 24)));
+    if (out.some((v) => v.act === 'throw')) out = out.filter((v) => v.act !== 'kick');
+    out = out.filter((v) => !(v.act === 'say' && out.some((o) => o.act === 'shout' && Math.abs(o.idx - v.idx) < 12)));
+    out.sort((a, b) => a.idx - b.idx);
+    return out.filter((v, i) => !i || v.idx >= out[i - 1].end - 1 || v.act !== out[i - 1].act);
+  };
+  function plan(raw) {
+    const notes = [], quotes = [];
+    const txt = String(raw || '').replace(/[„"“”«»]([^„"“”«»]+)[„"“”«»]/g, (_, q) => { quotes.push(q.trim()); return ' qqq' + (quotes.length - 1) + ' '; });
+    const n = nz(txt);
+    /* obsada */
+    const words = n.split(/[^a-z0-9]+/).filter(Boolean);
+    const ordMax = words.reduce((m, w) => { const i = /^pierwsz/.test(w) ? 0 : /^drug/.test(w) ? 1 : /^trzec/.test(w) ? 2 : /^czwart/.test(w) ? 3 : -1; return MX(m, i); }, -1);
+    const kinds = []; words.forEach((w) => { const k = /^(chlopak|facet|mezczyzn|gosc|pan)\w*$/.test(w) && w !== 'panie' ? 'm' : /^(dziewczyn|kobiet|laska|pani)\w*$/.test(w) ? 'f' : /^robot\w*$/.test(w) ? 'r' : null; if (k && !kinds.includes(k)) kinds.push(k); });
+    let cnt = /\b(dwie|dwoje|dwoch|dwa|dwie postacie|2 postacie)\b/.test(n) ? 2 : /\b(trzy|troje|trzech|3 postacie)\b/.test(n) ? 3 : /\b(cztery|czworo|czterech|4 postacie)\b/.test(n) ? 4 : 0;
+    const hasOther = /\b(drugiej|drugiego|drugiemu|drugich|niej|niego|jego|jej|go|ja|mu|jemu|ich|kogos|siebie|kolege|kolezanke|kolegi|kolezanki|kolega|przyjaciel\w*)\b/.test(n);
+    let N = MX(cnt, ordMax + 1, kinds.length || 0, 1); if (hasOther && N < 2) N = 2; N = cl4(N);
+    const cast = []; for (let i = 0; i < N; i++) cast.push({ k: kinds[i] || null });
+    if (ordMax < 0 && kinds.length < N && !cnt) { /* brak określeń */ }
+    const looks = cast.map((c, i) => c.k === 'f' ? Object.assign({}, Anim.LOOKS[1]) : c.k === 'r' ? Object.assign({}, Anim.ROBOT) : c.k === 'm' ? Object.assign({}, Anim.LOOKS[0]) : Object.assign({}, Anim.LOOKS[i % 4]));
+    const names = cast.map((c, i) => (c.k === 'f' ? 'Dziewczyna' : c.k === 'r' ? 'Robot' : c.k === 'm' ? 'Chłopak' : 'Postać ' + (i + 1)));
+    const idxOfKind = (k) => cast.findIndex((c) => c.k === k);
+    /* otoczenie, styl, kamera, tempo */
+    let style = /\b3d\b|trojwymiar|przestrzenn/.test(n) ? '3d' : /\b2d\b|plask|kreskowk|bajk\w*|anime|rysunk/.test(n) ? '2d' : '3d';
+    let bg = 'park', bestIdx = 1e9; BGKEY.forEach(([id, re]) => { const m = re.exec(n); if (m && m.index < bestIdx) { bestIdx = m.index; bg = id; } });
+    const cam = /z bliska|zblizeni|\bclose\b|blisko|detal/.test(n) ? 'close' : /z daleka|szerok|cala scen|szeroki/.test(n) ? 'wide' : 'auto';
+    const slow = /zwolnion\w* tempie|slow ?mo|w zwolnieniu|powoli/.test(n) ? 1.7 : 1;
+    const minDur = (/przez (\d+) sek/.exec(n) || [])[1] ? +(/przez (\d+) sek/.exec(n))[1] : 0;
+    /* klauzule */
+    const clauses = n.split(/\s*(?:[.;!?]+|,|\bi potem\b|\ba potem\b|\bpotem\b|\bnastepnie\b|\bpo czym\b|\bwtedy\b|\bnagle\b|\bi\b|\ba\b|\boraz\b|\bale\b)\s*/).map((s) => s.trim()).filter(Boolean);
+    const pos = cast.map((c, i) => { const sp = Anim.startPos(N, i); return [sp.x, sp.z]; }), ct = cast.map(() => 0.3), steps = [];
+    let T = 0.3, lastSubj = [0], lastTarget = -1, pending = [];
+    const classify = (cl) => {
+      const verbs = findVerbs(cl), v0 = verbs.length ? verbs[0].idx : 1e9, men = [], re = /[a-z0-9]+/g; let m;
+      while ((m = re.exec(cl))) {
+        const w = m[0], at = m.index; let idx = -1, role = 'amb';
+        if (/^pierwsz/.test(w)) idx = 0; else if (/^drug/.test(w)) idx = 1; else if (/^trzec/.test(w)) idx = 2; else if (/^czwart/.test(w)) idx = 3;
+        if (idx >= 0 && /(ej|ego|emu|ym|ich)$/.test(w)) role = 'obj';
+        if (idx < 0) {
+          if (/^(chlopak|facet|mezczyzn|gosc)\w*$/.test(w)) idx = idxOfKind('m'); else if (/^(dziewczyn|kobiet|laska|pani)\w*$/.test(w)) idx = idxOfKind('f'); else if (/^robot\w*$/.test(w)) idx = idxOfKind('r');
+          else if (/^(on|ona|ono|oni|one)$/.test(w)) { role = 'subj'; idx = w === 'ona' ? idxOfKind('f') : w === 'on' ? idxOfKind('m') : -2; if (idx === -1) idx = -5; }
+          else if (/^(go|jego|niego|mu|jemu)$/.test(w)) { role = 'obj'; idx = idxOfKind('m'); if (idx < 0) idx = -3; } else if (/^(ja|jej|niej)$/.test(w)) { role = 'obj'; idx = idxOfKind('f'); if (idx < 0) idx = -3; }
+          else if (/^(postac|postaci|ludzik\w*|czlowiek\w*|bohater\w*|kolega|kolege|kolezank\w*)$/.test(w)) idx = -4;
+        }
+        if (idx === -1 && !/^(pierwsz|drug|trzec|czwart)/.test(w)) continue;
+        if (idx === -1) continue;
+        if (role === 'amb') role = at < v0 ? 'subj' : 'obj';
+        men.push({ i: idx, role, at });
+      }
+      return { verbs, men, all: /\b(oboje|obie|obaj|wszyscy|wszystkie|razem|jednoczesnie|wspolnie|oni|one)\b/.test(cl) };
+    };
+    const other = (s) => { const c = []; for (let i = 0; i < N; i++) if (i !== s) c.push(i); return c; };
+    clauses.forEach((cl) => {
+      const { verbs, men, all } = classify(cl); const q = /qqq(\d+)/.exec(cl);
+      let subj = [...new Set(men.filter((x) => x.role === 'subj' && x.i >= 0).map((x) => x.i))], tgt = (men.filter((x) => x.role === 'obj' && x.i >= 0)[0] || {}).i;
+      if (tgt == null && men.some((x) => x.role === 'obj' && x.i < 0)) tgt = -9;           /* „go/ją” bez znanej płci */
+      const generic = men.some((x) => x.i === -4 && x.role === 'subj');
+      if (!verbs.length && q) verbs.push({ act: 'say', idx: 0 });
+      if (!verbs.length) { if (subj.length) pending = pending.concat(subj); else if (/[a-z]/.test(cl) && !/^qqq/.test(cl) && cl.length > 3 && !/\b(w|na|nad|pod|przy|przez|do)\b/.test(cl.split(' ')[0])) notes.push('Nie rozpoznałem czynności w: „' + cl + '”'); return; }
+      if (all) subj = cast.map((_, i) => i);
+      if (!subj.length && men.some((x) => x.i === -5) && lastTarget >= 0) subj = [lastTarget];
+      if (!subj.length && generic) { subj = tgt >= 0 ? other(tgt).slice(0, 1) : lastSubj.slice(); }
+      if (pending.length) { subj = [...new Set(pending.concat(subj))]; pending = []; }
+      if (!subj.length) subj = tgt >= 0 ? other(tgt).slice(0, 1) : tgt === -9 ? [lastSubj[0] || 0] : lastSubj.slice();
+      subj = subj.filter((i) => i < N); if (!subj.length) subj = [0];
+      let clauseEnd = T;
+      subj.forEach((s) => {
+        let at = MX(T, ct[s]);
+        verbs.forEach((v, vi) => {
+          let actId = v.act === 'flee' ? 'run' : v.act; const a = Anim.ACTS[actId]; if (!a) return;
+          let tg = tgt != null && tgt >= 0 ? tgt : -1;
+          const needsT = a.tgt || ['approach', 'runto'].includes(actId) || v.act === 'flee';
+          if (needsT && tg < 0) { const o = other(s); tg = lastTarget >= 0 && lastTarget !== s ? lastTarget : (o[0] != null ? o[0] : -1); }
+          if (actId === 'walk' && tgt != null && tgt >= 0) actId = 'approach'; if (actId === 'run' && tgt != null && tgt >= 0 && v.act !== 'flee') actId = 'runto';
+          const A = Anim.ACTS[actId], st = { at: +at.toFixed(2), who: 'ABCD'[s], act: actId, target: tg >= 0 ? 'ABCD'[tg] : null };
+          let dur = A.dur, to = null;
+          if (A.mv || v.act === 'flee') {
+            const from = pos[s], tp = tg >= 0 ? pos[tg] : null, sp = Anim.speedOf(A.mv || 'run');
+            if (v.act === 'flee' && tp) { const dx = from[0] - tp[0], dz = from[1] - tp[1], d = Math.hypot(dx, dz) || 1; to = [from[0] + dx / d * 6, from[1] + dz / d * 6]; }
+            else if (tp && (actId === 'approach' || actId === 'runto')) {
+              const nx = verbs[vi + 1], ng = nx && Anim.ACTS[nx.act] && Anim.ACTS[nx.act].gap ? Anim.ACTS[nx.act].gap : A.gap, dx = tp[0] - from[0], dz = tp[1] - from[1], d = Math.hypot(dx, dz) || 1;
+              to = d > ng ? [tp[0] - dx / d * ng, tp[1] - dz / d * ng] : [from[0], from[1]]; st.gap = ng;
+              if (tg !== s && ct[tg] <= at) { steps.push({ at: st.at, who: 'ABCD'[tg], act: 'turn', target: 'ABCD'[s], dur: 0.6 }); ct[tg] = at + 0.6; }
+            } else { const dir = tp ? [tp[0] - from[0], tp[1] - from[1]] : [Anim.startPos(N, s).face, 0], d = Math.hypot(dir[0], dir[1]) || 1, L = A.mv === 'run' ? 5 : 3; to = [from[0] + dir[0] / d * L, from[1] + dir[1] / d * L]; }
+            st.to = to.map((z) => +z.toFixed(2)); dur = MX(0.4, Math.hypot(to[0] - from[0], to[1] - from[1]) / sp); pos[s] = to;
+          }
+          st.dur = +dur.toFixed(2);
+          if (['say', 'shout'].includes(actId)) st.text = q ? quotes[+q[1]] : (actId === 'shout' ? 'HEJ!' : '');
+          steps.push(st);
+          let end = at + dur;
+          if (A.react && tg >= 0) {
+            const hit = at + A.hitAt * dur, R = Anim.ACTS[A.react]; ct[tg] = MX(ct[tg], hit + A.reactDur); end = MX(end, hit + A.reactDur * 0.9);
+            if (R && R.knock) { const dx = pos[tg][0] - pos[s][0], dz = pos[tg][1] - pos[s][1], d = Math.hypot(dx, dz) || 1; pos[tg] = [pos[tg][0] + dx / d * R.knock, pos[tg][1] + dz / d * R.knock]; }
+          }
+          if (tg >= 0) lastTarget = tg;
+          at = at + dur; ct[s] = at; clauseEnd = MX(clauseEnd, end);
+        });
+      });
+      lastSubj = subj; T = clauseEnd + 0.15;
+    });
+    if (!steps.length) { notes.push('Nie rozpoznałem żadnej czynności — dodałem proste powitanie. Spróbuj np.: „pierwsza postać podchodzi do drugiej i uderza ją z liścia”.'); cast.forEach((_, i) => steps.push({ at: 0.4, who: 'ABCD'[i], act: 'wave', target: null, dur: 1.9 })); }
+    if (slow !== 1) steps.forEach((s) => { s.at = +(s.at * slow).toFixed(2); s.dur = +(s.dur * slow).toFixed(2); });
+    if (minDur) { const e = steps.reduce((m, s) => MX(m, s.at + s.dur), 0); if (e < minDur) steps.push({ at: minDur - 0.8, who: 'A', act: 'idle', target: null, dur: 0.8 }); }
+    const scene = Anim.newScene({ n: N, looks, over: { style, bg, cam, prompt: raw } });
+    scene.chars.forEach((c, i) => { c.name = names[i]; c.type = looks[i].hs === 'robot' ? 'robot' : 'human'; });
+    scene.steps = steps;
+    return { scene, notes };
+  }
+  const MX = Math.max, cl4 = (n) => Math.max(1, Math.min(4, n));
+  return { plan, EXAMPLES: [
+    'Pierwsza postać podchodzi do drugiej i uderza ją z liścia',
+    'Chłopak tańczy w parku, potem skacze i robi salto',
+    'Dziewczyna płacze, a chłopak podchodzi i ją przytula',
+    'Robot biegnie przez plażę i macha do drugiej postaci',
+    'Pierwsza postać popycha drugą, a druga upada, potem pierwsza się śmieje',
+    'Facet kopie piłkę do kolegi na stadionie, potem świętuje',
+    'W nocy w mieście w 2D: pierwsza postać kopie drugą, a druga upada',
+  ] };
+})();
+
+/* ---------- łączniki do dowolnego AI (opcjonalne; klucze zostają tylko na Twoim urządzeniu) ---------- */
+const AIProv = {
+  cfg: (() => { try { return Object.assign({ provider: 'local', url: '', key: '', model: '' }, JSON.parse(localStorage.getItem('kadr.ai') || '{}')); } catch (e) { return { provider: 'local', url: '', key: '', model: '' }; } })(),
+  save() { try { localStorage.setItem('kadr.ai', JSON.stringify(this.cfg)); } catch (e) { /* ok */ } },
+  PROVIDERS: [
+    ['local', 'Lokalny planer (bez AI, za darmo)'], ['ollama', 'Ollama (AI lokalnie na Twoim komputerze, za darmo)'], ['gemini', 'Google Gemini (darmowy klucz API)'],
+    ['openai', 'OpenAI-kompatybilne (OpenRouter, Groq, LM Studio, OpenAI…)'],
+  ],
+  DEFAULTS: { ollama: { url: 'http://localhost:11434', model: 'llama3.1' }, gemini: { url: '', model: 'gemini-2.0-flash' }, openai: { url: 'https://openrouter.ai/api/v1', model: 'meta-llama/llama-3.3-70b-instruct:free' } },
+  system() {
+    return `You are an animation director for a stick-figure 2D/3D animation engine. Convert the user's scene description (any language) into ONE JSON object and nothing else.
+Schema: {"style":"3d"|"2d","bg":${JSON.stringify(Anim.BG_LIST)},"cam":"auto"|"wide"|"close","chars":[{"id":"A","name":"...","type":"human"|"robot","skin":"#rrggbb","shirt":"#rrggbb","pants":"#rrggbb","hair":"#rrggbb","hs":"short"|"long"|"bun"|"cap"|"none"}],"steps":[{"at":seconds,"dur":seconds,"who":"A","act":${JSON.stringify(Anim.ACT_LIST.filter((a) => !['slapped', 'punched', 'kicked', 'pushed', 'hit', 'hugged'].includes(a)))},"target":"B"|null,"text":"optional speech"}]}
+Rules: 1-4 characters with ids A,B,C,D; they start apart (two characters are ~4.6 m apart, facing each other). Walking speed is 1.45 m/s, running 3.6 m/s, so "approach" from the start positions takes about 3 seconds. Steps of different characters may overlap in time but one character's steps must not overlap. Acts that need a target (approach, slap, punch, kick, push, hug, kiss, throw, point, look, shout) must set "target". Reactions of the victim (stagger, fall) are added automatically — do NOT add them; after a hit the victim is busy for ~1.5 s. Total length 5-20 seconds. Output valid JSON only.`;
+  },
+  async fetchJson(url, opt, ms = 60000) {
+    const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), ms);
+    try { const r = await fetch(url, Object.assign({ signal: ctl.signal }, opt)); if (!r.ok) { let b = ''; try { b = (await r.text()).slice(0, 160); } catch (e) { /* ok */ } throw new Error('HTTP ' + r.status + (b ? ' ' + b : '')); } return await r.json(); }
+    catch (e) { throw new Error(e.name === 'AbortError' ? 'przekroczono czas oczekiwania' : /Failed to fetch|NetworkError|Load failed/.test(e.message) ? 'brak połączenia lub blokada CORS (uruchom aplikację instalacyjną albo sprawdź adres)' : e.message); }
+    finally { clearTimeout(tm); }
+  },
+  async complete(userText, sysOverride) {
+    const c = this.cfg, d = this.DEFAULTS[c.provider] || {}, model = c.model || d.model, sys = sysOverride || this.system();
+    if (c.provider === 'ollama') { const j = await this.fetchJson((c.url || d.url).replace(/\/$/, '') + '/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, stream: false, format: 'json', messages: [{ role: 'system', content: sys }, { role: 'user', content: userText }] }) }, 180000); return j.message && j.message.content; }
+    if (c.provider === 'gemini') { if (!c.key) throw new Error('podaj klucz API Gemini'); const j = await this.fetchJson(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(c.key)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ systemInstruction: { parts: [{ text: sys }] }, contents: [{ role: 'user', parts: [{ text: userText }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.4 } }) }); return j.candidates && j.candidates[0] && j.candidates[0].content.parts[0].text; }
+    if (c.provider === 'openai') {
+      const url = (c.url || d.url).replace(/\/$/, '') + '/chat/completions', hd = { 'Content-Type': 'application/json' }; if (c.key) hd.Authorization = 'Bearer ' + c.key;
+      const body = { model, temperature: 0.4, messages: [{ role: 'system', content: sys }, { role: 'user', content: userText }] };
+      let j; try { j = await this.fetchJson(url, { method: 'POST', headers: hd, body: JSON.stringify(Object.assign({ response_format: { type: 'json_object' } }, body)) }); } catch (e) { if (!/HTTP 4/.test(e.message)) throw e; j = await this.fetchJson(url, { method: 'POST', headers: hd, body: JSON.stringify(body) }); }
+      return j.choices && j.choices[0] && j.choices[0].message.content;
+    }
+    throw new Error('nie wybrano dostawcy AI');
+  },
+  async plan(text) {
+    const out = await this.complete(text); if (!out) throw new Error('pusta odpowiedź');
+    const m = /\{[\s\S]*\}/.exec(String(out)); if (!m) throw new Error('odpowiedź nie jest JSON-em');
+    const sc = Anim.sanitize(JSON.parse(m[0])); if (!sc) throw new Error('niepoprawny scenariusz');
+    if (!sc.steps.length) throw new Error('AI nie zaplanowało żadnych czynności');
+    sc.prompt = text; return sc;
+  },
+  /* obraz AI z darmowego Pollinations (bez klucza); wymaga internetu */
+  async image(prompt, w = 1280, h = 720) {
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&seed=${Math.floor(Math.random() * 1e6)}`;
+    const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 90000);
+    try { const r = await fetch(url, { signal: ctl.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); const b = await r.blob(); if (!/^image\//.test(b.type)) throw new Error('to nie obraz'); return b; }
+    catch (e) { throw new Error(e.name === 'AbortError' ? 'przekroczono czas oczekiwania' : /Failed to fetch|NetworkError|Load failed/.test(e.message) ? 'brak połączenia lub blokada CORS' : e.message); } finally { clearTimeout(tm); }
+  },
+};
+
+/* ---------- dodawanie sceny na oś ---------- */
+function addSceneClip(scene) {
+  const sc = clone(scene), dur = Anim.duration(sc), lane = 'v1';
+  const start = clips.some((c) => c.lane === 'v1') ? laneEnd('v1') : 0;
+  const c = newClip('scene', { lane, start: resolveStart({ id: '' }, lane, start, dur), dur, scene: sc });
+  c.animIn = { id: 'none', dur: 0.6 }; addClip(c); return c;
+}
+
+/* ---------- panel „AI” ---------- */
+UI.tabs.splice(UI.tabs.findIndex((t) => t.id === 'tools'), 0, { id: 'ai', label: 'AI', ic: 'bot' });
+UI._ai = { text: '', style: 'auto', bg: 'auto', cam: 'auto', busy: false, scene: null, notes: [], img: '', imgBusy: false, imgMsg: '', testMsg: '' };
+const _renderPanel = UI.renderPanel;
+UI.renderPanel = function (keepScroll) {
+  if (S.tab !== 'ai') return _renderPanel.call(this, keepScroll);
+  const box = $('#panel'), sc = box.scrollTop; box.innerHTML = ''; this.pAI(box); if (keepScroll) box.scrollTop = sc;
+};
+UI.aiGenerate = async function () {
+  const st = this._ai, text = st.text.trim();
+  if (!text) { toast('Opisz najpierw scenę'); return; }
+  st.busy = true; st.notes = []; st.scene = null; this.renderPanel(true);
+  let scene = null;
+  if (AIProv.cfg.provider !== 'local') { try { scene = await AIProv.plan(text); st.notes.push('Scenariusz ułożył zewnętrzny model AI (' + AIProv.cfg.provider + ').'); } catch (e) { st.notes.push('AI nie odpowiedziało (' + e.message + ') — użyłem lokalnego planera.'); } }
+  if (!scene) { const r = Planner.plan(text); scene = r.scene; st.notes.push(...r.notes); }
+  if (st.style !== 'auto') scene.style = st.style; if (st.bg !== 'auto') scene.bg = st.bg; if (st.cam !== 'auto') scene.cam = st.cam;
+  scene.prompt = text; st.scene = scene; st.busy = false; this.renderPanel(true);
+};
+UI.aiPreview = function (cv, scene) {
+  const t0 = performance.now(), dur = Anim.duration(scene) + 0.6, x = cv.getContext('2d');
+  const loop = (now) => { if (!cv.isConnected || this._ai.scene !== scene) return; Anim.draw(x, cv.width, cv.height, scene, ((now - t0) / 1000) % dur); requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+};
+UI.pAI = function (box) {
+  const st = this._ai, A = AIProv.cfg;
+  box.append(h('div', { class: 'p-head' }, h('h3', {}, 'AI Studio'), h('span', { class: 'badge' }, 'NOWE')));
+  box.append(h('div', { class: 'card2' }, h('h5', {}, 'Animator scen 2D / 3D'),
+    F.hint('Opisz scenę po polsku — np. „pierwsza postać podchodzi do drugiej i uderza ją z liścia”. Własny silnik narysuje animację 2D lub 3D z kamerą, efektami i tłem. Działa lokalnie i za darmo: bez Claude, bez kredytów.'),
+    h('p', { class: 'hint' }, 'Planer: ' + (AIProv.PROVIDERS.find((p) => p[0] === A.provider) || [])[1] + '. Zewnętrzne AI (np. darmowy Gemini albo Ollama) włączysz niżej w ustawieniach — wtedy układa dłuższe, bardziej swobodne scenariusze.'),
+    h('textarea', { class: 'txt', rows: 4, placeholder: 'Opisz scenę… np. Dziewczyna płacze, a chłopak podchodzi i ją przytula', oninput: (e) => { st.text = e.target.value; } }, st.text),
+    h('div', { class: 'chips ex' }, Planner.EXAMPLES.map((e) => h('button', { class: 'chip', onclick: () => { st.text = e; this.renderPanel(true); } }, e.length > 44 ? e.slice(0, 42) + '…' : e))),
+    F.seg('Styl', [['auto', 'Auto'], ['3d', '3D'], ['2d', '2D']], () => st.style, (v) => { st.style = v; setTimeout(() => this.renderPanel(true), 0); }),
+    F.select('Tło', [['auto', 'Dobierz z opisu'], ...Anim.BG_LIST.map((id) => [id, Anim.BGS[id].n])], () => st.bg, (v) => { st.bg = v; }),
+    F.seg('Kamera', [['auto', 'Auto'], ['wide', 'Szeroko'], ['close', 'Blisko']], () => st.cam, (v) => { st.cam = v; setTimeout(() => this.renderPanel(true), 0); }),
+    F.btn(st.busy ? 'Układam scenariusz…' : 'Generuj animację', () => { if (!st.busy) this.aiGenerate(); }, 'primary block', 'sparkles')));
+  if (st.notes.length) box.append(h('div', { class: 'note' }, st.notes.map((n) => h('div', {}, n))));
+  if (st.scene) {
+    const sc = st.scene, asp = (ASPECTS[P.aspect] || [16, 9]), W = 320, Hh = Math.round(W * asp[1] / asp[0]);
+    const cv = h('canvas', { class: 'aiprev', width: W * 2, height: Hh * 2, style: `aspect-ratio:${asp[0]}/${asp[1]}` });
+    box.append(h('div', { class: 'card2' }, h('h5', {}, 'Podgląd (' + Anim.duration(sc).toFixed(1) + ' s)'), cv,
+      h('ol', { class: 'steps' }, sc.steps.slice().sort((a, b) => a.at - b.at).map((s) => h('li', {}, h('b', {}, (sc.chars.find((c) => c.id === s.who) || {}).name || s.who), ' — ' + (Anim.ACTS[s.act] || {}).n.toLowerCase() + (s.target ? ' ' + ((sc.chars.find((c) => c.id === s.target) || {}).name || s.target) : '') + (s.text ? ' „' + s.text + '”' : '')))),
+      h('div', { class: 'row2' }, F.btn('Dodaj na oś', () => { const c = addSceneClip(sc); UI.insTab = 'ovl'; commit(); Engine.seek(c.start); toast('Dodano animację. Edytuj ją w panelu „Edytuj → Scena”.'); }, 'primary', 'plus'), F.btn('Inna wersja', () => this.aiGenerate(), '', 'repeat'))));
+    this.aiPreview(cv, sc);
+  }
+  /* obraz AI */
+  box.append(h('div', { class: 'card2' }, h('h5', {}, 'Obraz AI (darmowy)'),
+    F.hint('Generuje obraz z opisu (usługa Pollinations, bez klucza, wymaga internetu) i dodaje go do biblioteki — np. jako tło lub zdjęcie. Nie działa w trybie bez internetu.'),
+    h('input', { type: 'text', class: 'txt', placeholder: 'np. neonowe miasto nocą, styl anime', value: st.img, oninput: (e) => { st.img = e.target.value; } }),
+    F.btn(st.imgBusy ? 'Generuję obraz…' : 'Generuj obraz', async () => {
+      if (st.imgBusy || !st.img.trim()) return; st.imgBusy = true; st.imgMsg = ''; this.renderPanel(true);
+      try { const [cw, ch] = canvasSize(P.aspect, 720), b = await AIProv.image(st.img.trim(), cw, ch), f = new File([b], 'AI ' + st.img.trim().slice(0, 24) + '.jpg', { type: b.type }); const m = await importFile(f, { gen: true }); st.imgMsg = m ? 'Dodano do biblioteki (zakładka Media).' : 'Nie udało się wczytać obrazu.'; }
+      catch (e) { st.imgMsg = 'Nie udało się: ' + e.message; }
+      st.imgBusy = false; this.renderPanel(true);
+    }, 'block', 'image'), st.imgMsg ? h('p', { class: 'hint' }, st.imgMsg) : null));
+  /* ustawienia dostawcy */
+  const d = AIProv.DEFAULTS[A.provider] || {};
+  box.append(h('div', { class: 'card2' }, h('h5', {}, 'Ustawienia AI (opcjonalne)'),
+    F.hint('Domyślnie nie potrzebujesz żadnego AI. Jeśli chcesz, aby AI układało scenariusze, wybierz dostawcę. Ollama działa lokalnie i jest darmowa; Gemini i OpenRouter mają darmowe plany. Klucz jest zapisany tylko w tej przeglądarce/aplikacji i nie trafia do nas.'),
+    F.select('Dostawca', AIProv.PROVIDERS, () => A.provider, (v) => { A.provider = v; AIProv.save(); UI.renderPanel(true); }),
+    A.provider !== 'local' ? h('div', { class: 'aiform' },
+      A.provider !== 'gemini' ? h('input', { type: 'text', class: 'txt', placeholder: 'Adres: ' + (d.url || ''), value: A.url, onchange: (e) => { A.url = e.target.value.trim(); AIProv.save(); } }) : null,
+      A.provider !== 'ollama' ? h('input', { type: 'password', class: 'txt', placeholder: 'Klucz API', value: A.key, onchange: (e) => { A.key = e.target.value.trim(); AIProv.save(); } }) : null,
+      h('input', { type: 'text', class: 'txt', placeholder: 'Model: ' + (d.model || ''), value: A.model, onchange: (e) => { A.model = e.target.value.trim(); AIProv.save(); } }),
+      F.btn('Przetestuj połączenie', async () => { st.testMsg = 'Łączę…'; UI.renderPanel(true); try { const sc = await AIProv.plan('Dwie postacie: pierwsza macha do drugiej.'); st.testMsg = 'Działa! Model zwrócił scenariusz (' + sc.steps.length + ' kroków).'; } catch (e) { st.testMsg = 'Błąd: ' + e.message; } UI.renderPanel(true); }, 'sm', 'bolt'),
+      st.testMsg ? h('p', { class: 'hint' }, st.testMsg) : null) : null));
+  box.append(F.hint('Wskazówka: po dodaniu na oś kliknij animację i otwórz „Edytuj → Scena”, aby zmienić postacie, kroki, tło i kamerę. Animacja wchodzi do eksportu jak zwykły klip.'));
+};
+
+/* ---------- inspektor sceny ---------- */
+const _insOverlay = UI.insOverlay;
+const _tabs6 = UI.insTabsFor;
+UI.insTabsFor = function (c) { if (c && c.type === 'scene') return [['ovl', 'Scena'], ['basic', 'Pozycja'], ['anim', 'Animacje'], ['adjust', 'Dostosuj'], ['fxs', 'Efekty']]; return _tabs6.call(this, c); };
+UI.insOverlay = function (b, c) {
+  if (c.type !== 'scene') return _insOverlay.call(this, b, c);
+  const sc = c.scene, ids = sc.chars.map((x) => x.id), nameOf = (id) => (sc.chars.find((x) => x.id === id) || {}).name || id;
+  const sel = (opts, val, fn) => h('select', { class: 'mini', onchange: (e) => fn(e.target.value) }, opts.map(([v, t]) => h('option', { value: v, selected: v === val }, t)));
+  b.append(h('div', { class: 'card2' }, h('h5', {}, 'Opis sceny'),
+    h('textarea', { class: 'txt', rows: 3, oninput: (e) => { sc.prompt = e.target.value; } }, sc.prompt || ''),
+    F.btn('Ułóż scenariusz od nowa z opisu', async () => {
+      const text = (sc.prompt || '').trim(); if (!text) { toast('Wpisz opis'); return; }
+      let ns = null; if (AIProv.cfg.provider !== 'local') { try { ns = await AIProv.plan(text); } catch (e) { toast('AI nie odpowiedziało – użyłem lokalnego planera'); } }
+      if (!ns) { const r = Planner.plan(text); ns = r.scene; if (r.notes.length) toast(r.notes[0]); }
+      Object.assign(sc, { style: ns.style, bg: ns.bg, cam: ns.cam, chars: ns.chars, steps: ns.steps, prompt: text }); c.dur = Anim.duration(sc); commit();
+    }, 'sm', 'sparkles')));
+  b.append(F.seg('Styl', [['3d', '3D'], ['2d', '2D']], () => sc.style, (v) => { sc.style = v; }), F.select('Tło', Anim.BG_LIST.map((id) => [id, Anim.BGS[id].n]), () => sc.bg, (v) => { sc.bg = v; }), F.seg('Kamera', [['auto', 'Auto'], ['wide', 'Szeroko'], ['close', 'Blisko']], () => sc.cam, (v) => { sc.cam = v; }));
+  b.append(F.title('Postacie'));
+  sc.chars.forEach((ch) => {
+    b.append(h('div', { class: 'card2' }, h('div', { class: 'row2' }, h('input', { class: 'txt', value: ch.name, onchange: (e) => { ch.name = e.target.value.slice(0, 24); commit(); } }), sel([['human', 'Człowiek'], ['robot', 'Robot']], ch.type, (v) => { ch.type = v; commit(); })),
+      sel([['short', 'Krótkie włosy'], ['long', 'Długie włosy'], ['bun', 'Kok'], ['cap', 'Czapka'], ['none', 'Łysy']], ch.hs === 'robot' ? 'none' : ch.hs, (v) => { ch.hs = v; commit(); }),
+      F.color('Koszulka', () => ch.shirt, (v) => { ch.shirt = v; }), F.color('Spodnie', () => ch.pants, (v) => { ch.pants = v; }), F.color('Skóra', () => ch.skin, (v) => { ch.skin = v; }), F.color('Włosy', () => ch.hair, (v) => { ch.hair = v; })));
+  });
+  b.append(F.title('Scenariusz'));
+  const acts = Anim.ACT_LIST.filter((a) => !['slapped', 'punched', 'kicked', 'pushed', 'hit', 'hugged'].includes(a)).map((a) => [a, Anim.ACTS[a].n]), list = h('div', { class: 'steps2' });
+  sc.steps.map((s, i) => [s, i]).sort((a, b2) => (a[0].at || 0) - (b2[0].at || 0)).forEach(([s, i]) => {
+    const A = Anim.ACTS[s.act] || {}, row = h('div', { class: 'strow' },
+      h('div', { class: 'r1' }, sel(ids.map((id) => [id, nameOf(id)]), s.who, (v) => { s.who = v; commit(); }), sel(acts, s.act, (v) => { s.act = v; commit(); }),
+        (A.tgt || A.mv) ? sel([['', '—'], ...ids.filter((id) => id !== s.who).map((id) => [id, nameOf(id)])], s.target || '', (v) => { s.target = v || null; commit(); }) : null),
+      h('div', { class: 'r2' }, h('label', {}, 'od', h('input', { type: 'number', step: 0.1, min: 0, value: +(s.at || 0).toFixed(2), onchange: (e) => { s.at = Math.max(0, +e.target.value || 0); commit(); } }), 's'),
+        h('label', {}, 'czas', h('input', { type: 'number', step: 0.1, min: 0, value: +(s.dur || 0).toFixed(2), onchange: (e) => { s.dur = Math.max(0, +e.target.value || 0); commit(); }, title: '0 = automatycznie' }), 's'),
+        h('button', { class: 'tb', title: 'Usuń krok', onclick: () => { sc.steps.splice(i, 1); commit(); }, html: icon('trash', 14) })),
+      ['say', 'shout'].includes(s.act) ? h('input', { class: 'txt', placeholder: 'Tekst w dymku', value: s.text || '', onchange: (e) => { s.text = e.target.value.slice(0, 60); commit(); } }) : null);
+    list.append(row);
+  });
+  b.append(list, F.hint('Reakcje (np. potknięcie po uderzeniu) dodają się same. „Czas 0” = silnik dobiera go sam (np. do długości marszu).'),
+    h('div', { class: 'row2' }, F.btn('Dodaj krok', () => { const last = sc.steps.reduce((m, s) => Math.max(m, (s.at || 0) + (s.dur || 1.5)), 0.3); sc.steps.push({ at: +last.toFixed(2), dur: 0, who: ids[0], act: 'wave', target: null, text: '' }); commit(); }, 'sm', 'plus'),
+      F.btn('Dopasuj długość klipu', () => { c.dur = Anim.duration(sc); commit(); toast('Długość klipu: ' + c.dur.toFixed(1) + ' s'); }, 'sm', 'fit')));
+};

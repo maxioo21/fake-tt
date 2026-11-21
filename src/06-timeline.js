@@ -161,6 +161,7 @@ const TL = {
     if (c.type === 'text') return c.text.str.replace(/\n/g, ' ');
     if (c.type === 'sticker') return c.sticker.shape ? (SHAPES[c.sticker.shape] || {}).name || 'Kształt' : c.sticker.emoji;
     if (c.type === 'overlay') return (OVERLAYS[c.overlay && c.overlay.id] || {}).name || 'Nakładka';
+    if (c.type === 'scene') return 'Animacja AI' + (c.scene && c.scene.prompt ? ': ' + c.scene.prompt.slice(0, 28) : '');
     if (c.type === 'fx') return c.fx.length ? c.fx.map((e) => (FX[e.id] || {}).name).join(' + ') : ((FILTERS[c.filter.id] || {}).name !== 'Brak' ? (FILTERS[c.filter.id] || {}).name : 'Efekt / filtr');
     const m = getMedia(c); return m ? m.name : '';
   },
@@ -194,7 +195,7 @@ const TL = {
     return el;
   },
   typeIcon(c) {
-    return icon({ video: 'video', image: 'image', audio: 'music', text: 'type', sticker: 'smile', fx: 'sparkles', overlay: 'layers' }[c.type] || 'film', 12);
+    return icon({ video: 'video', image: 'image', audio: 'music', text: 'type', sticker: 'smile', fx: 'sparkles', overlay: 'layers', scene: 'bot' }[c.type] || 'film', 12);
   },
   drawWave(cv, c, w, small) {
     const m = getMedia(c); if (!m || !m.peaks) { cv.width = 2; return; }

@@ -182,19 +182,22 @@ const Tools = {
     if (!st.topic.trim()) { st.msg = 'Opisz najpierw, o czym jest film.'; UI.renderPanel(true); return; }
     st.busy = true; st.msg = ''; UI.renderPanel(true);
     try {
-      const sample = await getSample();
-      if (!sample) { st.msg = 'Asystent działa po otwarciu aplikacji w Claude (wymaga połączenia z Claude).'; return; }
+      const useAI = AIProv.cfg.provider !== 'local';
+      const sample = useAI ? null : await getSample();
+      if (!useAI && !sample) { st.msg = 'Asystent działa po otwarciu aplikacji w Claude albo po podłączeniu innego AI (zakładka AI → Ustawienia AI).'; return; }
       const topic = st.topic.trim().slice(0, 1200);
       const prompts = {
         captions: 'Odpowiedz wyłącznie tablicą JSON z 8 krótkimi napisami na ekran (maks. 6 słów każdy, po polsku, chwytliwe, bez hasztagów) do krótkiego filmu. Temat filmu:\n' + topic,
         hook: 'Odpowiedz wyłącznie tablicą JSON z 6 propozycjami otwarcia krótkiego filmu (pierwsze 2 sekundy, maks. 8 słów każda, po polsku, budzące ciekawość). Temat filmu:\n' + topic,
         post: 'Odpowiedz wyłącznie tablicą JSON z dokładnie 2 stringami: [0] krótki angażujący opis posta (po polsku, 1-2 zdania), [1] jedna linia z 8 trafnymi hasztagami oddzielonymi spacją. Temat filmu:\n' + topic,
       };
-      const arr = await sample.json(prompts[st.kind], { modelTier: 'quick' });
+      let arr;
+      if (useAI) { const out = await AIProv.complete(prompts[st.kind], 'Odpowiadaj wyłącznie poprawną tablicą JSON.'), m = /\[[\s\S]*\]/.exec(String(out || '')); if (!m) throw new Error('odpowiedź nie jest tablicą JSON'); arr = JSON.parse(m[0]); }
+      else arr = await sample.json(prompts[st.kind], { modelTier: 'quick' });
       st.items = (Array.isArray(arr) ? arr : [arr]).map((x) => String(x)).filter(Boolean).slice(0, 10);
     } catch (e) {
       const code = e && e.code;
-      st.msg = code === 'not_granted' ? 'Nie zezwolono na użycie Claude.' : code === 'rate_limited' ? 'Za dużo zapytań. Spróbuj za chwilę.' : code === 'invalid_json' ? 'Claude odpowiedział w nieoczekiwanym formacie. Spróbuj ponownie.' : 'Nie udało się połączyć z Claude.';
+      st.msg = code === 'not_granted' ? 'Nie zezwolono na użycie Claude.' : code === 'rate_limited' ? 'Za dużo zapytań. Spróbuj za chwilę.' : code === 'invalid_json' ? 'Claude odpowiedział w nieoczekiwanym formacie. Spróbuj ponownie.' : (AIProv.cfg.provider !== 'local' ? 'Błąd AI: ' + ((e && e.message) || 'brak połączenia') : 'Nie udało się połączyć z Claude.');
     } finally { st.busy = false; UI.renderPanel(true); }
   },
 };

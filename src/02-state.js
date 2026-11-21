@@ -192,7 +192,7 @@ function trimLeft(c, newStart) {
   const end = clipEnd(c);
   let ns = clamp(newStart, 0, end - 0.1);
   let delta = ns - c.start;
-  if (hasMedia(c) && c.type !== 'image') {
+  if ((hasMedia(c) && c.type !== 'image') || c.type === 'scene') {
     const newIn = c.inPt + delta * c.speed;
     if (newIn < 0) { delta = -c.inPt / c.speed; ns = c.start + delta; }
     c.inPt = Math.max(0, c.inPt + delta * c.speed);

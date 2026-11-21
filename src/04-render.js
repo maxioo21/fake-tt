@@ -348,6 +348,13 @@ class Renderer {
     if (!s) { s = c.sticker.shape ? makeShapeSprite(c.sticker, this.W, this.H) : makeStickerSprite(c.sticker, this.W, this.H); this._cache(key, s); }
     return s;
   }
+  sceneCanvas(c, t) {
+    if (!this._scn) this._scn = new Map();
+    let cv = this._scn.get(c.id);
+    if (!cv || cv.width !== this.W || cv.height !== this.H) { cv = mkCanvas(this.W, this.H); this._scn.set(c.id, cv); if (this._scn.size > 12) this._scn.delete(this._scn.keys().next().value); }
+    Anim.draw(cv.getContext('2d'), this.W, this.H, c.scene, c.inPt + (t - c.start) * (c.speed || 1));
+    return cv;
+  }
   _cache(k, v) { this.sprites.set(k, v); if (this.sprites.size > 80) this.sprites.delete(this.sprites.keys().next().value); }
 
   /* geometria klipu (do ramki zaznaczenia) */
@@ -357,6 +364,7 @@ class Renderer {
     if (c.type === 'video' || c.type === 'image') { const m = getMedia(c); if (!m || !m.w) return null; ow = m.w; oh = m.h; base = Math.min(W / ow, H / oh); }
     else if (c.type === 'text') { const sp = this.textSprite(c, null); ow = sp.width; oh = sp.height; }
     else if (c.type === 'sticker') { const sp = this.stickerSprite(c); ow = sp.width; oh = sp.height; }
+    else if (c.type === 'scene') { ow = W; oh = H; }
     else return null;
     return { cx: W / 2 + kfVal(c, 'x', lt) * W, cy: H / 2 + kfVal(c, 'y', lt) * H, w: ow * base * kfVal(c, 'scale', lt), h: oh * base * kfVal(c, 'scale', lt), rot: kfVal(c, 'rot', lt) * Math.PI / 180 };
   }
@@ -506,6 +514,7 @@ class Renderer {
       if (['shift', 'rainbow', 'galaxy', 'glitter'].includes(T0.fillMode) || T0.glowCycle || T0.strokeCycle) { tfx = tfx || { mode: 'fill', t: Math.max(0, lt), p: 1 }; if (tfx.t == null) tfx.t = Math.max(0, lt); }
       src = this.textSprite(c, tfx); ow = src.width; oh = src.height;
     } else if (c.type === 'sticker') { src = this.stickerSprite(c); ow = src.width; oh = src.height; }
+    else if (c.type === 'scene') { src = this.sceneCanvas(c, t); ow = this.W; oh = this.H; }
     else {
       const s = this.provider.get(c, t);
       if (!s) return;
