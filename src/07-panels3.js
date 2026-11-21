@@ -179,7 +179,7 @@ function textStylePreview(x, w, hh, p, style, tm) {
   const plain = Object.assign({}, T, { shadowB: 0, glowA: 0, blur: 0, strokeW: 0, out2W: 0, hardD: 0, shD: 0, bg: '', ul: false, fillMode: 'solid' });
   const tight = makeTextSprite(plain, refW, ref, null), padT = 0.5 * T.size * Math.min(refW, ref);
   const k = Math.min((w * 0.84) / Math.max(1, tight.width - padT), (hh * 0.7) / Math.max(1, tight.height - padT), big ? 2.2 : 1.6);
-  if (seeThrough) { x.drawImage(sceneFor(w, hh, 0), 0, 0); x.fillStyle = 'rgba(0,0,0,.18)'; x.fillRect(0, 0, w, hh); }   /* tło, przez które widać przezroczysty napis */
+  if (seeThrough) drawTextBackdrop(x, w, hh);   /* neutralne tło (bez postaci), przez które widać przezroczysty napis */
   else { x.fillStyle = big ? '#1b1e29' : '#23262f'; x.fillRect(0, 0, w, hh); }
   x.save(); x.beginPath(); x.rect(0, 0, w, hh); x.clip();
   x.translate(w / 2 + st.dx * w, hh / 2 + st.dy * hh); x.rotate(st.r); x.scale(st.s * st.fl, st.s * st.fy); x.globalAlpha = clamp(st.al, 0, 1);

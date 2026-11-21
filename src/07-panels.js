@@ -174,7 +174,7 @@ function tile(label, drawFn, o = {}) {
   el.addEventListener('pointerenter', (e) => {
     if (e.pointerType !== 'mouse' || document.body.classList.contains('dnd')) return;
     if (o.anim !== false) TileAnim.start(t);
-    HoverPop.show(el, t, o.anim !== false, o.popTitle || label);
+    if (o.pop !== false) HoverPop.show(el, t, o.anim !== false, o.popTitle || label);
   });
   el.addEventListener('pointerleave', () => { TileAnim.stop(); HoverPop.hide(); });
   el.addEventListener('pointerdown', () => HoverPop.hide());
@@ -376,9 +376,9 @@ const UI = {
 
   /* ---------- Efekty ---------- */
   pEffects(box) {
-    box.append(h('div', { class: 'p-head' }, h('h3', {}, 'Efekty')), this.modeSeg(), this.chipsFor('effects', FX_CATS));
+    box.append(h('div', { class: 'p-head' }, h('h3', {}, 'Efekty')), this.modeSeg(), this.chipsFor('effects', ['Wszystkie', ...FX_GROUPS]));
     const sel = byId(S.sel), grid = h('div', { class: 'tgrid' });
-    Object.values(FX).filter((f) => f.cat === this.catState.effects).forEach((f) => {
+    Object.values(FX).filter((f) => this.catState.effects === 'Wszystkie' || fxGroup(f.cat) === this.catState.effects).forEach((f) => {
       const on = this._mode === 'clip' && sel && sel.fx.some((e) => e.id === f.id);
       grid.append(fxTile(f.id, on, () => {
         if (this._mode === 'clip' && sel) {
@@ -398,10 +398,10 @@ const UI = {
     const ok = sel && prev && isVisual(sel) && sel.type !== 'fx';
     box.append(h('div', { class: 'note' + (ok ? ' ok' : '') }, ok ? 'Przejście między „' + this.clipTitle(prev) + '” a „' + this.clipTitle(sel) + '”.' : 'Przeciągnij przejście na styk dwóch klipów na osi (lub na klip) albo zaznacz klip i kliknij kafelek. Można też kliknąć „+” między klipami.'));
     if (ok) box.append(F.slider('Czas trwania', () => sel.trans.dur, (v) => { sel.trans.dur = v; }, 0.2, 2.5, 0.1, (v) => v.toFixed(1) + ' s', () => this.previewTrans(sel)));
-    box.append(this.chipsFor('trans', ['Popularne', 'Przesuwanie', 'Odsłanianie', 'Efekty']));
+    box.append(this.chipsFor('trans', ['Wszystkie', 'Popularne', 'Przesuwanie', 'Odsłanianie', 'Efekty']));
     const grid = h('div', { class: 'tgrid' });
     grid.append(transTile('none', ok && sel.trans.id === 'none', () => { if (ok) { sel.trans.id = 'none'; commit(); } }));
-    Object.values(TRANS).filter((t) => t.cat === this.catState.trans).forEach((t) => {
+    Object.values(TRANS).filter((t) => this.catState.trans === 'Wszystkie' || t.cat === this.catState.trans).forEach((t) => {
       grid.append(transTile(t.id, ok && sel.trans.id === t.id, () => {
         if (!ok) { toast('Najpierw zaznacz klip, który styka się z poprzednim klipem'); return; }
         sel.trans.id = t.id; commit(); this.previewTrans(sel);
@@ -418,9 +418,9 @@ const UI = {
 
   /* ---------- Filtry ---------- */
   pFilters(box) {
-    box.append(h('div', { class: 'p-head' }, h('h3', {}, 'Filtry')), this.modeSeg(), this.chipsFor('filters', FILTER_CATS));
+    box.append(h('div', { class: 'p-head' }, h('h3', {}, 'Filtry')), this.modeSeg(), this.chipsFor('filters', ['Wszystkie', ...FILTER_GROUPS]));
     const sel = byId(S.sel), grid = h('div', { class: 'tgrid' });
-    Object.entries(FILTERS).filter(([id, f]) => id === 'none' ? this.catState.filters === 'Popularne' : f.cat === this.catState.filters).forEach(([id, f]) => {
+    Object.entries(FILTERS).filter(([id, f]) => id === 'none' ? ['Wszystkie', 'Popularne'].includes(this.catState.filters) : (this.catState.filters === 'Wszystkie' || filterGroup(f.cat) === this.catState.filters)).forEach(([id, f]) => {
       const on = this._mode === 'clip' && sel && sel.filter.id === id;
       grid.append(filterTile(id, on, () => {
         if (this._mode === 'clip' && sel) { sel.filter = { id, amt: sel.filter.amt == null ? 1 : sel.filter.amt }; commit(); }

@@ -123,7 +123,7 @@ UI.pStickers = function (box) {
    ZAKŁADKA „GOTOWE”
    ============================================================ */
 UI.readyTab = 'looks';
-UI.catState.looks = 'Edit'; UI.catState.ovl = 'Światło'; UI.catState.pack = 'Popularne';
+UI.catState.looks = 'Wszystkie'; UI.catState.ovl = 'Wszystkie'; UI.catState.pack = 'Wszystkie';
 UI.pReady = function (box) {
   box.append(h('div', { class: 'p-head' }, h('h3', {}, 'Gotowe')),
     F.hint('Gotowe efekty do edytów. Kliknij kafelek albo przeciągnij go na klip na osi lub na podgląd. Bez napisów.'));
@@ -136,11 +136,11 @@ UI.targetHint = function () {
   return n ? `Zastosuję do zaznaczonych klipów (${n}).` : 'Nic nie zaznaczono, więc zastosuję do wszystkich klipów wideo i zdjęć na osi.';
 };
 UI.rLooks = function (box) {
-  const cats = [...new Set(LOOKS.map((l) => l.cat))], cur = cats.includes(this.catState.looks) ? this.catState.looks : cats[0];
+  const cats = ['Wszystkie', ...new Set(LOOKS.map((l) => l.cat))], cur = cats.includes(this.catState.looks) ? this.catState.looks : 'Wszystkie';
   box.append(h('div', { class: 'chips' }, cats.map((k) => h('button', { class: 'chip' + (k === cur ? ' on' : ''), onclick: () => { this.catState.looks = k; this.renderPanel(); } }, k))));
   box.append(F.hint(this.targetHint()));
   const grid = h('div', { class: 'tgrid' });
-  LOOKS.filter((l) => l.cat === cur).forEach((l) => {
+  LOOKS.filter((l) => cur === 'Wszystkie' || l.cat === cur).forEach((l) => {
     const fake = newClip('image'); l.apply(fake);
     grid.append(tile(l.name, (x, w, hh, p, tm) => {
       const sc = sceneFor(w, hh, 0);
@@ -184,11 +184,11 @@ UI.rBeat = function (box) {
   box.append(h('div', { class: 'card2' }, h('h5', {}, 'Wskazówki do edytów'), h('p', { class: 'hint' }, '1. Wrzuć 1–3 dłuższe klipy na ścieżkę główną i muzykę na ścieżkę audio. 2. Kliknij „Zmontuj na bit”. 3. Dopieść: Looki (CC), Prędkość (krzywe), Nakładki (iskry, wycieki światła, błyski).')));
 };
 UI.rOverlays = function (box) {
-  const cats = OVERLAY_CATS, cur = this.catState.ovl;
+  const cats = ['Wszystkie', ...OVL_GROUPS], cur = this.catState.ovl;
   box.append(h('div', { class: 'chips' }, cats.map((k) => h('button', { class: 'chip' + (k === cur ? ' on' : ''), onclick: () => { this.catState.ovl = k; this.renderPanel(); } }, k))));
   box.append(F.hint('Animowane nakładki rysowane na żywo. Kliknij, aby dodać w miejscu głowicy, albo przeciągnij na wybraną ścieżkę lub podgląd. Kolor i tryb mieszania zmienisz w „Edytuj”.'));
   const grid = h('div', { class: 'tgrid' });
-  Object.values(OVERLAYS).filter((o) => o.cat === cur).forEach((o) => {
+  Object.values(OVERLAYS).filter((o) => cur === 'Wszystkie' || ovlGroup(o.cat) === cur).forEach((o) => {
     grid.append(tile(o.name, (x, w, hh, p, tm) => {
       drawScene(x, w, hh, 1);
       const ov = POOL.get(w, hh), lt = p == null ? Math.min(o.d * 0.18, 0.5) + 0.2 : (tm % Math.min(o.d, 3));
@@ -205,9 +205,9 @@ UI.rPack = function (box) {
     F.slider('Czas przejścia', () => st.dur, (v) => { st.dur = v; }, 0.15, 2, 0.05, (v) => v.toFixed(2) + ' s'),
     F.btn('Zastosuj do wszystkich cięć', () => Looks.packTransitions(st.id, st.dur), 'primary block', 'transition'),
     h('div', { class: 'row2' }, F.btn('Losowe', () => Looks.packTransitions('random', st.dur), 'sm', 'repeat'), F.btn('Usuń wszystkie', () => Looks.packTransitions('none', st.dur), 'sm', 'x'))));
-  box.append(this.chipsFor('pack', TRANS_CATS));
+  box.append(this.chipsFor('pack', ['Wszystkie', ...TRANS_CATS]));
   const grid = h('div', { class: 'tgrid' });
-  Object.values(TRANS).filter((t) => t.cat === this.catState.pack).forEach((t) => grid.append(transTile(t.id, st.id === t.id, () => { st.id = t.id; this.renderPanel(true); })));
+  Object.values(TRANS).filter((t) => this.catState.pack === 'Wszystkie' || t.cat === this.catState.pack).forEach((t) => grid.append(transTile(t.id, st.id === t.id, () => { st.id = t.id; this.renderPanel(true); })));
   box.append(grid);
 };
 

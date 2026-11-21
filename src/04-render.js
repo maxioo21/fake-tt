@@ -68,7 +68,7 @@ function makeTextSprite(T, W, H, tfx) {
   const phase0 = ft * fSpeed * 0.2;
   const glowStr = (a) => (T.glowCycle ? cyc(phase0, a) : rgba(T.glowC || '#ffffff', a));
   const strokeStr = () => (T.strokeCycle ? cyc(phase0 + 0.5, T.strokeA == null ? 1 : T.strokeA) : strokeCol);
-  const pad = Math.ceil(fs * (0.25 + T.shadowB * 1.4 + Math.abs(sdist) * 1.1 + (glowBase > 0 ? (T.glowB == null ? 0.5 : T.glowB) * 1.1 : 0) + blurAmt * 0.55) + lw + lw2 * 2 + hard + (T.bg ? bgP + fs * 0.05 : 0) + (per ? fs * 0.8 : 0));
+  const pad = Math.ceil(fs * (0.25 + T.shadowB * 1.4 + Math.abs(sdist) * 1.1 + (glowBase > 0 ? (T.glowB == null ? 0.5 : T.glowB) * 1.5 + 0.1 : 0) + blurAmt * 0.55) + lw + lw2 * 2 + hard + (T.bg ? bgP + fs * 0.05 : 0) + (per ? fs * 0.8 : 0));
   const w = Math.max(fs * 0.5, Math.ceil(tw + pad * 2)), hh = Math.max(fs, Math.ceil(lines.length * lh + pad * 2));
   let cv = mkCanvas(w, hh);
   const x = cv.getContext('2d');
@@ -103,11 +103,15 @@ function makeTextSprite(T, W, H, tfx) {
     const sh = () => { if (hasSh) { x.shadowColor = shCol; x.shadowBlur = T.shadowB * fs; x.shadowOffsetX = shx; x.shadowOffsetY = shy; } };
     if (hard > 0) { x.fillStyle = T.hardC || '#000'; x.strokeStyle = T.hardC || '#000'; x.lineWidth = lw + lw2 * 2; x.fillText(txt, px + hard, py + hard); if (x.lineWidth > 0.4) x.strokeText(txt, px + hard, py + hard); }
     if (glowA > 0.01) {
-      const passes = glowA > 1.2 ? 3 : glowA > 0.6 ? 2 : 1;
-      x.shadowColor = glowStr(clamp(glowA, 0, 1)); x.shadowBlur = (T.glowB == null ? 0.5 : T.glowB) * fs * 0.9 + fs * 0.05; x.shadowOffsetX = 0; x.shadowOffsetY = 0;
-      x.fillStyle = fillOver || T.color;
-      if (fa < 0.999 && !noGrad) { x.shadowOffsetX = 5000; for (let i = 0; i < passes; i++) x.fillText(txt, px - 5000, py); }   /* przezroczysty napis: rysujemy samą poświatę, bez pełnego wypełnienia */
-      else for (let i = 0; i < passes; i++) x.fillText(txt, px, py);
+      const gA = glowA * 1.5, passes = Math.min(9, Math.max(1, Math.ceil(gA * 2.2))), wide = (T.glowB == null ? 0.5 : T.glowB) * fs * 1.15 + fs * 0.08;
+      x.fillStyle = fillOver || T.color; x.shadowOffsetX = 0; x.shadowOffsetY = 0;
+      const emit = (blur, alpha, n) => {
+        x.shadowColor = glowStr(clamp(alpha, 0, 1)); x.shadowBlur = blur;
+        if (fa < 0.999 && !noGrad) { x.shadowOffsetX = 5000; for (let i = 0; i < n; i++) x.fillText(txt, px - 5000, py); x.shadowOffsetX = 0; }   /* przezroczysty napis: samą poświatę, bez pełnego wypełnienia */
+        else for (let i = 0; i < n; i++) x.fillText(txt, px, py);
+      };
+      emit(wide, gA, passes);                      /* szeroka łuna */
+      emit(wide * 0.38, gA * 0.95, Math.ceil(passes * 0.6));   /* jasny rdzeń tuż przy literach */
       clearShadow();
     }
     let first = true;

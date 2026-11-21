@@ -323,3 +323,37 @@ body.dnd, body.dnd * { cursor: grabbing !important; user-select: none !important
 .numw { display: flex; align-items: center; gap: 4px; }
 .num { width: 66px; padding: 3px 6px; font-family: var(--mono); font-size: 11.5px; background: var(--panel2); border: 1px solid var(--line2); border-radius: 6px; color: var(--fg); text-align: right; }
 .numw em { font-style: normal; color: var(--dim); font-size: 11px; }
+
+/* animacje w inspektorze */
+.animtabs { display: flex; background: var(--panel2); border-radius: 10px; padding: 3px; gap: 2px; }
+.animtabs button { flex: 1; padding: 8px 6px; border-radius: 8px; border: 0; background: transparent; color: var(--mut); font-weight: 700; font-size: 12.5px; position: relative; }
+.animtabs button.on { background: var(--bg); color: var(--fg); box-shadow: 0 1px 3px rgba(0, 0, 0, .4); }
+.animtabs .dot { position: absolute; top: 6px; right: 8px; width: 6px; height: 6px; border-radius: 50%; background: var(--acc2); }
+.tsearch { padding: 9px 12px; }
+
+/* ---------- wyszukiwarki ---------- */
+.tsearch { padding: 9px 12px 9px 34px; width: 100%; background: var(--panel2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b93ad' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") no-repeat 11px 50%; }
+.snote { padding: 8px 10px; border-radius: 9px; background: var(--panel2); border: 1px solid var(--line); color: var(--mut); font-size: 12px; line-height: 1.5; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+.snote b { color: var(--fg); }
+.snote p { flex-basis: 100%; margin: 0; }
+.snote .chip { padding: 3px 9px; font-size: 11.5px; }
+.srow { display: flex; flex-direction: column; gap: 6px; }
+.sres { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line2); background: var(--panel2); color: var(--fg); }
+.sres b { font-size: 13px; }
+.sres span { font-size: 11.5px; color: var(--dim); }
+.sres:hover { border-color: var(--acc); }
+.ctl.flash, h4.ttl.flash { animation: flashset 2.2s ease-out; border-radius: 8px; }
+@keyframes flashset { 0%, 60% { box-shadow: 0 0 0 3px var(--acc), 0 0 18px var(--acc); background: var(--accsoft); } 100% { box-shadow: 0 0 0 0 transparent; background: transparent; } }
+.sub.wrap button { flex: 1 1 auto; padding: 6px 8px; }
+/* ---------- gotowe edity: karty szablonów ---------- */
+.tplcard { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 11px; padding: 10px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); align-items: start; }
+.tplcard .tile { width: 128px; }
+.tplcard .tn { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.tplcard b { font-size: 13.5px; }
+.tplcard .tcat { font-size: 10px; padding: 2px 6px; border-radius: 6px; background: var(--accsoft); color: var(--acc2); font-weight: 700; }
+.tplcard p { margin: 4px 0 6px; color: var(--mut); font-size: 12px; line-height: 1.45; }
+.tplcard .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 7px; }
+.tplcard .tags i { font-style: normal; font-size: 10.5px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line2); color: var(--dim); }
+.tplcard .btn { padding: 6px 10px; }
+textarea.lyr { width: 100%; resize: vertical; min-height: 120px; font-size: 13px; line-height: 1.5; }
+@media (max-width: 520px) { .tplcard { grid-template-columns: 104px minmax(0, 1fr); } .tplcard .tile { width: 104px; } }

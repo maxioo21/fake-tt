@@ -45,7 +45,13 @@ npm run dist                  # instalator w katalogu release/
 - **Animacje tekstu** (16 wejścia/wyjścia, 8 pętli): maszyna z kursorem, szyfr, litery pop/zoom/obrót/przewrót, neon zapala się, glitch liter, rozmycie liter, słowa po kolei i inne.
 - **39 kształtów** wektorowych (strzałki, ramki, celowniki, kreski) i emoji w 12 kategoriach.
 
-**Zakładka „Gotowe” (bez napisów, do edytów)**
+**Wyszukiwarki (w każdym panelu i w ustawieniach napisów)**
+- Efekty, przejścia, filtry, naklejki, teksty, animacje (w prawym panelu), looki, krzywe prędkości, nakładki i szablony mają pole „Szukaj”. Rozumie polskie odmiany i synonimy: wpisz **„rozmazanie”** (albo „blur”, „nieostre”), a znajdzie rozmycie, smugę ruchu, bokeh i animacje z rozmyciem; **„światło”**, **„trzęsienie”**, **„szkło”**, **„poświata”** działają tak samo. Pod polem widać, jak zrozumiałem zapytanie (np. „Rozmycie — zmiękcza obraz…”).
+- Ustawienia napisu mają własną wyszukiwarkę: wpisz „poświata” albo „rozmazanie”, kliknij wynik, a przeskoczę do właściwej zakładki i podświetlę suwak.
+
+**Zakładka „Gotowe”: szablony edytów, looki, napisy z piosenki**
+- **Szablony (12 gotowych edytów)**: Football edit, Velocity, Glitch, Hype, Neonowa noc, Retro VHS, Kinowy trailer, Sny, Podróż/vlog, Lo-fi, Złoty hype, Mroczny edit. Jeden klik tnie klipy na rytm muzyki (albo co stały czas), nadaje każdemu ujęciu animację, efekty, krzywą prędkości i przejście oraz dodaje warstwę efektów. Wszystko to zwykłe klipy na osi — dalej edytujesz je ręcznie. Cofnięcie: Ctrl+Z.
+- **Napisy z piosenki**: wklej tekst (linijka = napis) albo wczytaj plik `.lrc` / `.srt` z czasami. Wybierz styl, animację, pozycję i tryb (linijka lub słowo po słowie). Napisy wchodzą na oś jako zwykłe klipy tekstowe — przesuwasz je i zmieniasz im styl. Można je dołączyć od razu do szablonu.
 - **Looki**: 35 gotowych kombinacji (CC, glitch hit, złoty edit, velocity, kino, retro…).
 - **Prędkość**: 11 krzywych jednym kliknięciem.
 - **Montaż na bit**: wykrywa rytm w muzyce, tnie klipy na uderzeniach i dodaje błyski, glitch lub wstrząsy na cięciach.
