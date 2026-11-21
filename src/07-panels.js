@@ -146,7 +146,7 @@ const UI = {
   tabs: [
     { id: 'media', label: 'Media', ic: 'film' }, { id: 'text', label: 'Tekst', ic: 'type' }, { id: 'stickers', label: 'Naklejki', ic: 'smile' },
     { id: 'effects', label: 'Efekty', ic: 'sparkles' }, { id: 'trans', label: 'Przejścia', ic: 'transition' }, { id: 'filters', label: 'Filtry', ic: 'wand' },
-    { id: 'tools', label: 'Narzędzia', ic: 'grid' }, { id: 'inspect', label: 'Edytuj', ic: 'sliders', mobile: true },
+    { id: 'ready', label: 'Gotowe', ic: 'bolt' }, { id: 'tools', label: 'Narzędzia', ic: 'grid' }, { id: 'inspect', label: 'Edytuj', ic: 'sliders', mobile: true },
   ],
   catState: { effects: 'Popularne', filters: 'Popularne', trans: 'Popularne', stickers: 'Popularne' },
   fxMode: 'auto', toolView: null,
@@ -155,9 +155,10 @@ const UI = {
     const rail = $('#rail'); rail.innerHTML = '';
     this.tabs.forEach((t) => rail.append(h('button', { class: 'rt' + (t.mobile ? ' mob' : ''), 'data-tab': t.id, title: t.label, onclick: () => this.openTab(t.id), html: icon(t.ic, 22) + `<span>${t.label}</span>` })));
     Bus.on('media', () => { if (S.tab === 'media') this.renderPanel(); });
-    Bus.on('select', () => { this.renderInspector(); if (['effects', 'filters', 'trans', 'text'].includes(S.tab)) this.renderPanel(true); });
-    Bus.on('change', () => { this.renderInspector(); if (['effects', 'filters', 'trans', 'text'].includes(S.tab)) this.renderPanel(true); });
+    Bus.on('select', () => { this.renderInspector(); if (['effects', 'filters', 'trans', 'text', 'ready'].includes(S.tab)) this.renderPanel(true); });
+    Bus.on('change', () => { this.renderInspector(); if (['effects', 'filters', 'trans', 'text', 'ready'].includes(S.tab)) this.renderPanel(true); });
     Bus.on('project', () => this.renderInspector());
+    Bus.on('time', () => { if (this.kfCtl && this.kfCtl.length) this.kfCtl.forEach((f) => f()); });
     Bus.on('ai', () => { if (S.tab === 'tools' || this.insTab === 'cut') { this.renderInspector(); } });
     this.openTab(S.tab);
     this.renderInspector();
@@ -173,7 +174,7 @@ const UI = {
   renderPanel(keepScroll) {
     const box = $('#panel'), sc = box.scrollTop;
     box.innerHTML = '';
-    const fn = { media: this.pMedia, text: this.pText, stickers: this.pStickers, effects: this.pEffects, trans: this.pTrans, filters: this.pFilters, tools: this.pTools }[S.tab];
+    const fn = { media: this.pMedia, text: this.pText, stickers: this.pStickers, effects: this.pEffects, trans: this.pTrans, filters: this.pFilters, ready: this.pReady, tools: this.pTools }[S.tab];
     if (fn) fn.call(this, box);
     if (keepScroll) box.scrollTop = sc;
   },
@@ -369,6 +370,7 @@ const UI = {
   renderInspector() {
     const box = $('#inspector'); if (!box) return;
     const sc = box.scrollTop;
+    this.kfCtl = [];
     box.innerHTML = '';
     const c = byId(S.sel);
     if (!c) { this.insProject(box); return; }
@@ -377,7 +379,7 @@ const UI = {
     box.append(h('div', { class: 'ins-head' }, h('span', { class: 'ico', html: TL.typeIcon(c) }), h('b', {}, this.clipTitle(c)), h('span', { class: 'dur' }, fmtDur(c.dur))));
     box.append(h('div', { class: 'itabs' }, tabs.map(([id, t]) => h('button', { class: id === this.insTab ? 'on' : '', onclick: () => { this.insTab = id; this.renderInspector(); } }, t))));
     const body = h('div', { class: 'ibody' });
-    const fn = { basic: this.insBasic, anim: this.insAnim, adjust: this.insAdjust, fxs: this.insFxs, cut: this.insCut, speed: this.insSpeed, audio: this.insAudio, text: this.insText }[this.insTab];
+    const fn = { basic: this.insBasic, anim: this.insAnim, adjust: this.insAdjust, fxs: this.insFxs, cut: this.insCut, speed: this.insSpeed, audio: this.insAudio, text: this.insText, mask: this.insMask, ovl: this.insOverlay }[this.insTab];
     if (fn) fn.call(this, body, c);
     box.append(body);
     box.scrollTop = sc;

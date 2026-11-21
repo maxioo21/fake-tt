@@ -27,16 +27,31 @@ npm run dist                  # instalator w katalogu release/
 
 ## Co potrafi
 
-- **Oś czasu**: 3 ścieżki wideo/nakładek + 2 ścieżki dźwięku, przeciąganie, przycinanie krawędzi, podział, duplikowanie, przyciąganie do krawędzi, znaczników i głowicy, cofnij/ponów, zoom.
-- **Efekty (22)**: Glitch, RGB, VHS, Stary TV, Retro DV, Mozaika, Lustro, Kalejdoskop, Fala, Echo, Puls, Trzęsienie, Soczewka, Poświata, Błysk, Stroboskop, Wyciek światła i inne. Na klip albo jako warstwa na osi.
-- **Przejścia (27)**: zanikanie, przez czerń/biel, rozmycie, zoom, obrót, przewrót, przesuwanie, przykrywanie, wycieraczki, koło, kostki, żaluzje, glitch, RGB, mozaika, wstrząs.
-- **Animacje**: 17 wejść/wyjść (plus „maszyna do pisania” dla tekstu) oraz 13 pętli (puls, serce, Ken Burns, panorama…). Najechanie na kafelek pokazuje podgląd w ruchu.
-- **Filtry (21)** i ręczna korekcja: jasność, kontrast, nasycenie, temperatura, odcień, rozmycie, winieta, ziarno.
+**Edycja**
+- Oś czasu: 3 ścieżki wideo/nakładek + 2 ścieżki audio, **magnetyczna ścieżka główna** (klipy zawsze stykają się, przeciągnięcie zmienia kolejność, usunięcie zamyka lukę), przycinanie krawędzi, podział, duplikowanie, kopiuj/wklej, zaznaczanie wielu klipów (Shift/Ctrl), przyciąganie z widoczną prowadnicą, ukrywanie, wyciszanie i blokowanie ścieżek, cofnij/ponów.
+- **Klatki kluczowe** (pozycja, skala, obrót, krycie) i przeciąganie po podglądzie, które je zapisuje.
+- **Maski** (koło, serce, gwiazda, romb, pasy…), **tryby mieszania** (15), przycinanie, odbicia.
+- **Krzywe prędkości** (Montaż, Bohater, Bullet time, Jump cut, Flash in/out i inne), z dźwiękiem zmieniającym tempo.
 - **Usuń tło**: AI (człowiek, lokalnie w przeglądarce) albo klucz koloru (zielony ekran, pipeta, auto z rogów).
-- **Tekst** (14 stylów, 10 czcionek, obrys, cień, tło, maszyna do pisania) i **naklejki** (emoji).
-- **Ustawienia filmu**: proporcje (16:9, 9:16, 1:1, 4:5, 3:4, 4:3, 21:9), rozmyte tło, klatkaż, rozdzielczość do 4K, jakość.
-- **Narzędzia**: usuwanie tła ze zdjęcia (PNG), asystent Claude (napisy, hooki, opis i hasztagi), auto-rytm (znaczniki na uderzeniach), odłączanie dźwięku, zatrzymanie klatki, zrzut klatki.
-- **Eksport**: MP4 (H.264) lub WebM (VP9/VP8) przez WebCodecs. Każda klatka jest renderowana osobno, a dźwięk miksowany offline.
+- Płynny podgląd: zegar czeka na bufor wideo, a jakość podglądu sama się obniża, gdy komputer nie nadąża (eksport zawsze w pełnej jakości).
+
+**Biblioteka efektów (wszystko własnym kodem)**
+- **67 efektów**: Glitch (blokowy, RGB, datamosh…), Retro (VHS, Retro DV, CCTV, stary film, półton, Polaroid…), Ruch (uderzenie zoom, wstrząsy, kamera z ręki, rozmycie radialne…), Światło (flara, promienie, bokeh, neon…), Kolor (duotone, cyberpunk, noktowizor…).
+- **61 przejść**: zoom-rozmycie, przepalenie taśmy, wyciek światła, błysk, odsłanianie (zegar, serce, romb, szachownica), rozbicie, glitch, przewijanie VHS i inne.
+- **53 filtry**, **38 animacji wejścia/wyjścia** i **27 pętli**.
+- **65 stylów tekstu** w 8 kategoriach (sport/edit, neon, retro, elegancja, zabawa, etykiety, napisy), 32 czcionki, gradient, twardy cień, podwójny obrys, animacje tekstu (maszyna do pisania, litery, słowa, fala, tęcza).
+- **39 kształtów** wektorowych (strzałki, ramki, celowniki, kreski) i emoji w 12 kategoriach.
+
+**Zakładka „Gotowe” (bez napisów, do edytów)**
+- **Looki**: 35 gotowych kombinacji (CC, glitch hit, złoty edit, velocity, kino, retro…).
+- **Prędkość**: 11 krzywych jednym kliknięciem.
+- **Montaż na bit**: wykrywa rytm w muzyce, tnie klipy na uderzeniach i dodaje błyski, glitch lub wstrząsy na cięciach.
+- **Nakładki**: 30 animowanych nakładek rysowanych na żywo (wycieki światła, błyski, fala uderzeniowa, linie prędkości, iskry, żar, bokeh, deszcz, błyskawice, konfetti…).
+- **Pakiety przejść**: jedno przejście (lub losowe) na wszystkich cięciach.
+
+**Narzędzia i eksport**
+- Usuwanie tła ze zdjęcia (PNG), asystent Claude (napisy, hooki, opis i hasztagi), auto-rytm, odłączanie dźwięku, zatrzymanie klatki, zrzut klatki.
+- Proporcje (16:9, 9:16, 1:1, 4:5, 3:4, 4:3, 21:9), rozmyte tło, klatkaż, eksport MP4/WebM do 4K przez WebCodecs.
 
 ## Skróty
 
@@ -46,6 +61,10 @@ npm run dist                  # instalator w katalogu release/
 | S | podziel klip w miejscu głowicy |
 | Delete | usuń zaznaczone |
 | Ctrl+D | duplikuj |
+| Ctrl+C / Ctrl+V | kopiuj / wklej klip |
+| Ctrl+A | zaznacz wszystko |
+| Shift+klik | zaznacz wiele klipów |
+| dwuklik na napisie | edycja tekstu na podglądzie |
 | Ctrl+Z / Ctrl+Shift+Z | cofnij / ponów |
 | M | znacznik |
 | ← → | klatka wstecz / w przód (Shift = 1 s) |

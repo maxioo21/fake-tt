@@ -11,6 +11,7 @@ const Stage = {
       h('i', { class: 'hd rot', 'data-hd': 'r' }), h('i', { class: 'stem' }));
     host.append(this.box);
     host.addEventListener('pointerdown', (e) => this.down(e));
+    host.addEventListener('dblclick', (e) => this.editText(e));
     window.addEventListener('pointermove', (e) => this.move(e));
     window.addEventListener('pointerup', () => this.up());
     window.addEventListener('pointercancel', () => this.up());
@@ -50,8 +51,8 @@ const Stage = {
       if (hitc) { c = hitc; mode = 'move'; if (S.sel !== c.id) { S.sel = c.id; Bus.emit('select'); TL.syncSel(); } }
       else { if (S.sel) { S.sel = null; Bus.emit('select'); TL.render(); } return; }
     }
-    const b = R.clipBox(c);
-    this.drag = { mode, c, sx: e.clientX, sy: e.clientY, o: { x: c.x, y: c.y, scale: c.scale, rot: c.rot }, ccx: r.left + b.cx * k, ccy: r.top + b.cy * k, moved: false };
+    const b = R.clipBox(c), lt0 = S.time - c.start;
+    this.drag = { mode, c, sx: e.clientX, sy: e.clientY, o: { x: kfVal(c, 'x', lt0), y: kfVal(c, 'y', lt0), scale: kfVal(c, 'scale', lt0), rot: kfVal(c, 'rot', lt0) }, ccx: r.left + b.cx * k, ccy: r.top + b.cy * k, moved: false };
     e.preventDefault();
   },
   move(e) {
@@ -63,18 +64,31 @@ const Stage = {
     if (d.mode === 'move') {
       let nx = d.o.x + dx / host.clientWidth, ny = d.o.y + dy / host.clientHeight;
       if (Math.abs(nx) < 0.012) nx = 0; if (Math.abs(ny) < 0.012) ny = 0;
-      c.x = nx; c.y = ny;
+      kfSet(c, 'x', S.time - c.start, nx); kfSet(c, 'y', S.time - c.start, ny);
     } else if (d.mode === 'scale') {
       const d0 = Math.hypot(d.sx - d.ccx, d.sy - d.ccy) || 1, d1 = Math.hypot(e.clientX - d.ccx, e.clientY - d.ccy);
-      c.scale = clamp(d.o.scale * d1 / d0, 0.05, 8);
+      kfSet(c, 'scale', S.time - c.start, clamp(d.o.scale * d1 / d0, 0.05, 8));
     } else if (d.mode === 'rot') {
       const a0 = Math.atan2(d.sy - d.ccy, d.sx - d.ccx), a1 = Math.atan2(e.clientY - d.ccy, e.clientX - d.ccx);
       let rot = d.o.rot + (a1 - a0) * 180 / Math.PI;
       rot = ((rot + 180) % 360 + 360) % 360 - 180;
       const snap = Math.round(rot / 45) * 45; if (Math.abs(rot - snap) < 3) rot = snap;
-      c.rot = rot;
+      kfSet(c, 'rot', S.time - c.start, rot);
     }
     Engine.invalidate(); this.update();
+  },
+  editText(e) {
+    const R = Engine.R, host = $('#stageHost'), r = host.getBoundingClientRect(), k = this.k();
+    const c = this.hit((e.clientX - r.left) / k, (e.clientY - r.top) / k);
+    if (!c || c.type !== 'text') return;
+    const b = R.clipBox(c), ta = h('textarea', { class: 'stage-edit', rows: 2 });
+    ta.value = c.text.str;
+    Object.assign(ta.style, { left: b.cx * k + 'px', top: b.cy * k + 'px', width: Math.max(160, b.w * k) + 'px', fontSize: Math.max(14, c.text.size * Math.min(R.W, R.H) * k * c.scale * 0.8) + 'px' });
+    host.append(ta); ta.focus(); ta.select();
+    ta.addEventListener('input', () => { c.text.str = ta.value; Engine.invalidate(); });
+    ta.addEventListener('blur', () => { ta.remove(); commit(); });
+    ta.addEventListener('keydown', (ev) => { ev.stopPropagation(); if (ev.key === 'Escape') ta.blur(); });
+    ta.addEventListener('pointerdown', (ev) => ev.stopPropagation());
   },
   up() {
     const d = this.drag; if (!d) return;

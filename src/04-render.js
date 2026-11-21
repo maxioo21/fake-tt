@@ -7,11 +7,12 @@ const TEXT_FONTS = ['Montserrat', 'Anton', 'Bebas Neue', 'Playfair Display', 'Pa
 const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
 /* ---------- sprite tekstu ---------- */
-function makeTextSprite(T, W, H, vis) {
+const TEXT_PER = ['letters', 'words', 'dropletters', 'wave', 'rainbow'];
+function makeTextSprite(T, W, H, tfx) {
   const fs = Math.max(8, Math.round(T.size * Math.min(W, H)));
   let str = T.str == null ? '' : String(T.str);
   if (T.upper) str = str.toUpperCase();
-  if (vis != null) str = str.slice(0, vis);
+  if (tfx && tfx.mode === 'typewriter') str = str.slice(0, Math.floor(clamp(tfx.p, 0, 1) * str.length));
   const mc = mkCanvas(8, 8).getContext('2d');
   const font = `${T.italic ? 'italic ' : ''}${T.bold ? '700' : '400'} ${fs}px "${T.font}", "Segoe UI", system-ui, sans-serif`;
   mc.font = font;
@@ -29,8 +30,9 @@ function makeTextSprite(T, W, H, vis) {
   }
   const lh = fs * T.lineH;
   let tw = 0; lines.forEach((l) => { tw = Math.max(tw, mc.measureText(l).width); });
-  const lw = T.strokeW * fs;
-  const pad = Math.ceil(fs * (0.25 + T.shadowB * 1.4) + lw + (T.bg ? fs * 0.35 : 0));
+  const lw = T.strokeW * fs, lw2 = (T.out2W || 0) * fs, hard = (T.hardD || 0) * fs;
+  const per = !!(tfx && TEXT_PER.includes(tfx.mode));
+  const pad = Math.ceil(fs * (0.25 + T.shadowB * 1.4) + lw + lw2 * 2 + hard + (T.bg ? fs * 0.35 : 0) + (per ? fs * 0.75 : 0));
   const w = Math.max(fs * 0.5, Math.ceil(tw + pad * 2)), hh = Math.max(fs, Math.ceil(lines.length * lh + pad * 2));
   const cv = mkCanvas(w, hh), x = cv.getContext('2d');
   x.font = font; x.textBaseline = 'middle'; x.lineJoin = 'round'; x.miterLimit = 2;
@@ -43,17 +45,44 @@ function makeTextSprite(T, W, H, vis) {
     if (x.roundRect) x.roundRect(bx, by, bw, bh, rx); else x.rect(bx, by, bw, bh);
     x.fill();
   }
-  const ax = T.align === 'left' ? pad : T.align === 'right' ? w - pad : w / 2;
-  x.textAlign = T.align === 'left' ? 'left' : T.align === 'right' ? 'right' : 'center';
+  const clearShadow = () => { x.shadowColor = 'transparent'; x.shadowBlur = 0; x.shadowOffsetY = 0; };
+  /* jedna „warstwowa” sztuka tekstu: twardy cień, obrys zewnętrzny, obrys, wypełnienie (opcjonalnie gradient) */
+  const run = (txt, px, py, fillOver) => {
+    const glow = T.shadowB > 0;
+    const sh = () => { if (glow) { x.shadowColor = T.shadowC; x.shadowBlur = T.shadowB * fs; x.shadowOffsetY = T.shadowB * fs * 0.25; } };
+    if (hard > 0) { x.fillStyle = T.hardC || '#000'; x.strokeStyle = T.hardC || '#000'; x.lineWidth = lw + lw2 * 2; x.fillText(txt, px + hard, py + hard); if (x.lineWidth > 0.4) x.strokeText(txt, px + hard, py + hard); }
+    let first = true;
+    const layer = (width, col) => { if (first) sh(); x.strokeStyle = col; x.lineWidth = width; x.strokeText(txt, px, py); if (first) { clearShadow(); first = false; } };
+    if (lw2 > 0.4) layer(lw + lw2 * 2, T.out2C || '#000');
+    if (lw > 0.4) layer(lw, T.strokeC);
+    let fill = fillOver || T.color;
+    if (!fillOver && T.fill2) { const g = x.createLinearGradient(0, py - fs * 0.55, 0, py + fs * 0.55); g.addColorStop(0, T.color); g.addColorStop(1, T.fill2); fill = g; }
+    x.fillStyle = fill;
+    if (first) sh();
+    x.fillText(txt, px, py);
+    if (first && T.shadowB > 0.35) x.fillText(txt, px, py);
+    clearShadow();
+  };
+  x.textAlign = 'left';
+  let g = 0, wi = 0;
+  const totalChars = lines.reduce((n, l) => n + l.length, 0), totalWords = Math.max(1, str.split(/\s+/).filter(Boolean).length);
   lines.forEach((l, i) => {
-    const y = pad + lh * (i + 0.5);
-    if (T.shadowB > 0) { x.shadowColor = T.shadowC; x.shadowBlur = T.shadowB * fs; x.shadowOffsetY = T.shadowB * fs * 0.25; }
-    if (lw > 0.4) {
-      x.strokeStyle = T.strokeC; x.lineWidth = lw; x.strokeText(l, ax, y);
-      x.shadowColor = 'transparent'; x.shadowBlur = 0; x.shadowOffsetY = 0;
+    const y = pad + lh * (i + 0.5), lwid = mc.measureText(l).width;
+    const left = T.align === 'left' ? pad : T.align === 'right' ? w - pad - lwid : w / 2 - lwid / 2;
+    if (!per) { run(l, left, y); return; }
+    for (let k = 0; k < l.length; k++) {
+      const ch = l[k], px = left + mc.measureText(l.slice(0, k)).width, cw = mc.measureText(ch).width;
+      let al = 1, sc = 1, yo = 0, fillOver = null;
+      if (tfx.mode === 'letters') { const q = clamp(tfx.p * (totalChars + 5) - g, 0, 5) / 5; al = Math.min(1, q * 2); sc = q <= 0 ? 0 : ease.outBack(q); }
+      else if (tfx.mode === 'dropletters') { const q = clamp(tfx.p * (totalChars + 5) - g, 0, 5) / 5; al = Math.min(1, q * 4); yo = -(1 - ease.outBounce(q)) * fs * 1.1; if (q <= 0) al = 0; }
+      else if (tfx.mode === 'words') { const q = clamp(tfx.p * (totalWords + 2) - wi, 0, 2) / 2; al = q; sc = lerp(0.6, 1, ease.out(q)); yo = (1 - q) * fs * 0.3; }
+      else if (tfx.mode === 'wave') yo = Math.sin(tfx.t * 5 + g * 0.55) * fs * 0.14;
+      else if (tfx.mode === 'rainbow') fillOver = `hsl(${Math.floor((tfx.t * 120 + g * 25) % 360)},95%,62%)`;
+      if (ch === ' ') wi++;
+      g++;
+      if (al <= 0.003 || ch === ' ') continue;
+      x.save(); x.globalAlpha = al; x.translate(px + cw / 2, y + yo); x.scale(sc, sc); run(ch, -cw / 2, 0, fillOver); x.restore();
     }
-    x.fillStyle = T.color; x.fillText(l, ax, y);
-    x.shadowColor = 'transparent'; x.shadowBlur = 0; x.shadowOffsetY = 0;
   });
   return cv;
 }
@@ -178,6 +207,7 @@ class Renderer {
   plan(t) {
     const out = [];
     for (const lane of VIS_ORDER) {
+      if (P.lanes && P.lanes.hidden && P.lanes.hidden[lane]) continue;
       const lc = clips.filter((c) => c.lane === lane && isVisual(c)).sort((a, b) => a.start - b.start);
       let pair = null;
       for (const B of lc) {
@@ -197,30 +227,31 @@ class Renderer {
     for (const p of this.plan(t)) { if (p.c) r.push(p.c); else { r.push(p.A, p.B); } }
     return r;
   }
-  textSprite(c, vis) {
+  textSprite(c, tfx) {
     if (typeof FontLoader !== 'undefined' && !this.exporting) FontLoader.ensure(c.text.font, c.text.bold);
-    const key = 'T' + JSON.stringify([c.text, vis, this.W, this.H]);
+    const tk = tfx ? [tfx.mode, Math.round((tfx.p || 0) * 40), Math.round((tfx.t || 0) * 20)] : null;
+    const key = 'T' + JSON.stringify([c.text, tk, this.W, this.H]);
     let s = this.sprites.get(key);
-    if (!s) { s = makeTextSprite(c.text, this.W, this.H, vis); this._cache(key, s); }
+    if (!s) { s = makeTextSprite(c.text, this.W, this.H, tfx); this._cache(key, s); }
     return s;
   }
   stickerSprite(c) {
     const key = 'S' + JSON.stringify([c.sticker, this.W, this.H]);
     let s = this.sprites.get(key);
-    if (!s) { s = makeStickerSprite(c.sticker, this.W, this.H); this._cache(key, s); }
+    if (!s) { s = c.sticker.shape ? makeShapeSprite(c.sticker, this.W, this.H) : makeStickerSprite(c.sticker, this.W, this.H); this._cache(key, s); }
     return s;
   }
   _cache(k, v) { this.sprites.set(k, v); if (this.sprites.size > 80) this.sprites.delete(this.sprites.keys().next().value); }
 
   /* geometria klipu (do ramki zaznaczenia) */
-  clipBox(c) {
-    const W = this.W, H = this.H;
+  clipBox(c, t) {
+    const W = this.W, H = this.H, lt = (t == null ? S.time : t) - c.start;
     let ow, oh, base = 1;
     if (c.type === 'video' || c.type === 'image') { const m = getMedia(c); if (!m || !m.w) return null; ow = m.w; oh = m.h; base = Math.min(W / ow, H / oh); }
     else if (c.type === 'text') { const sp = this.textSprite(c, null); ow = sp.width; oh = sp.height; }
     else if (c.type === 'sticker') { const sp = this.stickerSprite(c); ow = sp.width; oh = sp.height; }
     else return null;
-    return { cx: W / 2 + c.x * W, cy: H / 2 + c.y * H, w: ow * base * c.scale, h: oh * base * c.scale, rot: c.rot * Math.PI / 180 };
+    return { cx: W / 2 + kfVal(c, 'x', lt) * W, cy: H / 2 + kfVal(c, 'y', lt) * H, w: ow * base * kfVal(c, 'scale', lt), h: oh * base * kfVal(c, 'scale', lt), rot: kfVal(c, 'rot', lt) * Math.PI / 180 };
   }
 
   /* wycinanie tła */
@@ -325,20 +356,44 @@ class Renderer {
     ctx.save(); ctx.globalAlpha = alpha; ctx.drawImage(w, 0, 0); ctx.restore();
     POOL.free(w);
   }
+  drawOverlay(tctx, c, t, o) {
+    const def = OVERLAYS[c.overlay && c.overlay.id]; if (!def) return;
+    const W = this.W, H = this.H, lt = t - c.start, st = animState(c, lt, o), alpha = kfVal(c, 'opacity', lt) * st.al;
+    if (alpha < 0.003) return;
+    const ov = POOL.get(W, H), ox = ov.getContext('2d');
+    ox.save(); def.fn(ox, W, H, lt, c.dur, Object.assign({}, OV_DEFAULT, c.overlay)); ox.restore();
+    tctx.save();
+    tctx.globalCompositeOperation = blendOp(c.blend && c.blend !== 'normal' ? c.blend : def.blend);
+    tctx.globalAlpha = clamp(alpha, 0, 1);
+    tctx.translate(W / 2 + kfVal(c, 'x', lt) * W, H / 2 + kfVal(c, 'y', lt) * H); tctx.rotate(kfVal(c, 'rot', lt) * Math.PI / 180); const sc = kfVal(c, 'scale', lt) * st.s; tctx.scale(sc, sc);
+    tctx.drawImage(ov, -W / 2, -H / 2); tctx.restore();
+    POOL.free(ov);
+  }
+  applyMask(cv, c, cx, cy, dw, dh, rot) {
+    const m = c.mask, W = this.W, H = this.H, base = Math.min(dw, dh) * 0.5 * m.s;
+    let mk = POOL.get(W, H), mx = mk.getContext('2d');
+    const ang = rot + m.r * Math.PI / 180, ox = m.x * dw, oy = m.y * dh, cr = Math.cos(rot), sr = Math.sin(rot);
+    mx.save(); mx.translate(cx + ox * cr - oy * sr, cy + ox * sr + oy * cr); mx.rotate(ang); mx.fillStyle = '#fff'; mx.beginPath(); maskPath(mx, m.id, base); mx.fill(); mx.restore();
+    if (m.f > 0.01 && HAS_FILTER) { const b = POOL.copy(mk); mx.clearRect(0, 0, W, H); mx.filter = `blur(${(m.f * base * 0.6).toFixed(1)}px)`; mx.drawImage(b, 0, 0); mx.filter = 'none'; POOL.free(b); }
+    if (m.inv) { const inv = POOL.get(W, H), ix = inv.getContext('2d'); ix.fillStyle = '#fff'; ix.fillRect(0, 0, W, H); ix.globalCompositeOperation = 'destination-out'; ix.drawImage(mk, 0, 0); POOL.free(mk); mk = inv; }
+    const x = cv.getContext('2d'); x.save(); x.globalCompositeOperation = 'destination-in'; x.drawImage(mk, 0, 0); x.restore(); POOL.free(mk);
+  }
   drawClip(tctx, c, t, o = {}) {
     if (c.type === 'fx') { if (tctx === this.ctx) this.drawFxLayer(c, t); return; }
+    if (c.type === 'overlay') { this.drawOverlay(tctx, c, t, o); return; }
     const W = this.W, H = this.H, lt = t - c.start;
     const st = animState(c, lt, o);
-    const alpha = c.opacity * st.al;
+    const alpha = kfVal(c, 'opacity', lt) * st.al;
     if (alpha < 0.003) return;
     let src = null, ow, oh;
     if (c.type === 'text') {
-      let vis = null;
-      if (!o.trans && c.animIn.id === 'typewriter') {
-        const d = Math.max(0.1, Math.min(c.animIn.dur, c.dur * 0.6));
-        vis = Math.floor(clamp(lt / d, 0, 1) * String(c.text.str).length);
+      let tfx = null;
+      if (!o.trans) {
+        const ai = c.animIn.id;
+        if (['typewriter', 'letters', 'words', 'dropletters'].includes(ai)) { const d = Math.max(0.1, Math.min(c.animIn.dur, c.dur * 0.6)); if (lt < d) tfx = { mode: ai, p: clamp(lt / d, 0, 1) }; }
+        if (!tfx && (c.animLoop.id === 'wave' || c.animLoop.id === 'rainbow')) tfx = { mode: c.animLoop.id, t: Math.max(0, lt), p: 1 };
       }
-      src = this.textSprite(c, vis); ow = src.width; oh = src.height;
+      src = this.textSprite(c, tfx); ow = src.width; oh = src.height;
     } else if (c.type === 'sticker') { src = this.stickerSprite(c); ow = src.width; oh = src.height; }
     else {
       const s = this.provider.get(c, t);
@@ -348,12 +403,14 @@ class Renderer {
     }
     if (!ow || !oh) return;
     const base = (c.type === 'video' || c.type === 'image') ? Math.min(W / ow, H / oh) : 1;
-    const dw = ow * base * c.scale * st.s, dh = oh * base * c.scale * st.s;
-    const cx = W / 2 + (c.x + st.dx) * W, cy = H / 2 + (c.y + st.dy) * H, rot = c.rot * Math.PI / 180 + st.r;
-    const overlays = overlayList(c), need = c.fx.length > 0 || overlays.length > 0;
+    const ks = kfVal(c, 'scale', lt), dw = ow * base * ks * st.s, dh = oh * base * ks * st.s;
+    const cx = W / 2 + (kfVal(c, 'x', lt) + st.dx) * W, cy = H / 2 + (kfVal(c, 'y', lt) + st.dy) * H, rot = kfVal(c, 'rot', lt) * Math.PI / 180 + st.r;
+    const overlays = overlayList(c), hasMask = c.mask && c.mask.id !== 'none', need = c.fx.length > 0 || overlays.length > 0 || hasMask;
+    const blend = c.blend && c.blend !== 'normal' ? blendOp(c.blend) : null;
     let target = tctx, scratch = null;
     if (need) { scratch = POOL.get(W, H); target = scratch.getContext('2d'); }
     target.save();
+    if (blend && !need) target.globalCompositeOperation = blend;
     target.translate(cx, cy); target.rotate(rot);
     target.scale((c.flipX ? -1 : 1) * st.fl, c.flipY ? -1 : 1);
     target.globalAlpha = need ? 1 : alpha;
@@ -362,12 +419,18 @@ class Renderer {
       if (st.bl > 0.001) f = (f === 'none' ? '' : f + ' ') + `blur(${(st.bl * H).toFixed(1)}px)`;
       target.filter = f;
     }
-    target.drawImage(src, -dw / 2, -dh / 2, dw, dh);
+    const cr = c.crop;
+    if (cr && (cr.l || cr.t || cr.r || cr.b)) {
+      const sw = src.videoWidth || src.naturalWidth || src.width, sh = src.videoHeight || src.naturalHeight || src.height;
+      const l = clamp(cr.l, 0, 0.9), tp = clamp(cr.t, 0, 0.9), rr = clamp(cr.r, 0, 0.9 - l), bb = clamp(cr.b, 0, 0.9 - tp);
+      target.drawImage(src, l * sw, tp * sh, sw * (1 - l - rr), sh * (1 - tp - bb), -dw / 2 + l * dw, -dh / 2 + tp * dh, dw * (1 - l - rr), dh * (1 - tp - bb));
+    } else target.drawImage(src, -dw / 2, -dh / 2, dw, dh);
     target.restore();
     if (scratch) {
+      if (hasMask) this.applyMask(scratch, c, cx, cy, dw, dh, rot);
       applyOverlays(scratch, overlays, t);
       applyEffects(scratch, c.fx, lt);
-      tctx.save(); tctx.globalAlpha = alpha; tctx.drawImage(scratch, 0, 0); tctx.restore();
+      tctx.save(); if (blend) tctx.globalCompositeOperation = blend; tctx.globalAlpha = alpha; tctx.drawImage(scratch, 0, 0); tctx.restore();
       POOL.free(scratch);
     }
   }

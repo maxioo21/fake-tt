@@ -3,11 +3,11 @@
    Kadr Studio — stan projektu, historia, biblioteka mediów
    ============================================================ */
 const LANES = [
-  { id: 'v3', kind: 'v', label: 'Warstwa 2' },
-  { id: 'v2', kind: 'v', label: 'Warstwa 1' },
+  { id: 'v3', kind: 'v', label: 'Nakł. 2' },
+  { id: 'v2', kind: 'v', label: 'Nakł. 1' },
   { id: 'v1', kind: 'v', label: 'Główna', main: true },
-  { id: 'a1', kind: 'a', label: 'Dźwięk 1' },
-  { id: 'a2', kind: 'a', label: 'Dźwięk 2' },
+  { id: 'a1', kind: 'a', label: 'Audio 1' },
+  { id: 'a2', kind: 'a', label: 'Audio 2' },
 ];
 const VIS_ORDER = ['v1', 'v2', 'v3']; // od dołu do góry
 const laneKind = (id) => (LANES.find((l) => l.id === id) || {}).kind;
@@ -17,14 +17,14 @@ const ASPECTS = {
 };
 
 /* projekt */
-const P = { name: 'Mój film', aspect: '16:9', fps: 30, bg: '#000000', bgBlur: false, markers: [] };
+const P = { name: 'Mój film', aspect: '16:9', fps: 30, bg: '#000000', bgBlur: false, markers: [], lanes: { hidden: {}, muted: {}, locked: {} } };
 /* klipy (zmieniamy tablicę w miejscu, żeby referencje się nie psuły) */
 const clips = [];
 /* biblioteka mediów */
 const media = new Map();
 /* stan interfejsu */
 const S = {
-  time: 0, playing: false, sel: null, zoom: 90, snap: true,
+  time: 0, playing: false, sel: null, multi: [], zoom: 90, snap: true, magnet: true,
   tab: 'media', insTab: null, picker: null, demo: false, previewScale: 1,
 };
 
@@ -39,11 +39,12 @@ function newClip(type, o = {}) {
     trans: { id: 'none', dur: 0.7 },
     cut: { mode: 'none', key: '#00ff00', tol: 0.4, soft: 0.2, feather: 0.2, edge: 0, model: 0 },
     vol: 1, mute: false, fadeIn: 0, fadeOut: 0,
-    text: null, sticker: null,
+    blend: 'normal', crop: { l: 0, t: 0, r: 0, b: 0 }, mask: { id: 'none', x: 0, y: 0, s: 0.7, r: 0, f: 0.08, inv: false }, kf: {}, curve: 'none',
+    text: null, sticker: null, overlay: null,
   }, o);
 }
 function defText(str = 'Twój tekst') {
-  return { str, font: 'Montserrat', size: 0.085, color: '#ffffff', strokeC: '#000000', strokeW: 0.12, bg: '', bgA: 0.7, shadowC: '#000000', shadowB: 0.12, bold: true, italic: false, align: 'center', spacing: 0, lineH: 1.15, upper: false };
+  return { str, font: 'Montserrat', size: 0.085, color: '#ffffff', strokeC: '#000000', strokeW: 0.12, bg: '', bgA: 0.7, shadowC: '#000000', shadowB: 0.12, fill2: '', out2C: '#000000', out2W: 0, hardC: '#000000', hardD: 0, bold: true, italic: false, align: 'center', spacing: 0, lineH: 1.15, upper: false };
 }
 
 const byId = (id) => clips.find((c) => c.id === id);
@@ -54,7 +55,33 @@ const getMedia = (c) => (c && c.media ? media.get(c.media) : null);
 function projectDuration() { return clips.reduce((m, c) => Math.max(m, clipEnd(c)), 0); }
 function laneClips(laneId) { return clips.filter((c) => c.lane === laneId).sort((a, b) => a.start - b.start); }
 function laneEnd(laneId) { return clips.reduce((m, c) => (c.lane === laneId ? Math.max(m, clipEnd(c)) : m), 0); }
-const srcTime = (c, t) => c.inPt + (t - c.start) * c.speed;
+const srcTime = (c, t) => {
+  if (c.curve && c.curve !== 'none' && typeof curveFns === 'function') { const f = curveFns(c.curve); if (f) return c.inPt + c.speed * c.dur * f.M((t - c.start) / c.dur); }
+  return c.inPt + (t - c.start) * c.speed;
+};
+/* klatki kluczowe: c.kf[prop] = [{t (s od początku klipu), v}] */
+function kfVal(c, prop, lt) {
+  const pts = c.kf && c.kf[prop];
+  if (!pts || !pts.length) return c[prop];
+  if (lt <= pts[0].t) return pts[0].v;
+  if (lt >= pts[pts.length - 1].t) return pts[pts.length - 1].v;
+  for (let i = 1; i < pts.length; i++) if (lt <= pts[i].t) { const a = pts[i - 1], b = pts[i], k = (lt - a.t) / Math.max(1e-6, b.t - a.t); return lerp(a.v, b.v, k * k * (3 - 2 * k)); }
+  return c[prop];
+}
+function kfHas(c, prop) { return !!(c.kf && c.kf[prop] && c.kf[prop].length); }
+function kfAt(c, prop, lt) { return kfHas(c, prop) && c.kf[prop].some((p) => Math.abs(p.t - lt) < 0.035); }
+/* ustawia wartość: gdy właściwość ma klatki kluczowe, wstawia/aktualizuje klatkę w bieżącym czasie */
+function kfSet(c, prop, lt, v) {
+  if (!kfHas(c, prop)) { c[prop] = v; return; }
+  const pts = c.kf[prop], i = pts.findIndex((p) => Math.abs(p.t - lt) < 0.035);
+  if (i >= 0) pts[i].v = v; else { pts.push({ t: Math.max(0, lt), v }); pts.sort((a, b) => a.t - b.t); }
+}
+function kfToggle(c, prop, lt) {
+  if (!c.kf) c.kf = {};
+  if (kfAt(c, prop, lt)) { c.kf[prop] = c.kf[prop].filter((p) => Math.abs(p.t - lt) >= 0.035); if (!c.kf[prop].length) delete c.kf[prop]; }
+  else { const v = kfVal(c, prop, lt); if (!kfHas(c, prop)) c.kf[prop] = []; c.kf[prop].push({ t: Math.max(0, lt), v }); c.kf[prop].sort((a, b) => a.t - b.t); }
+}
+function kfShift(c, delta) { if (!c.kf) return; Object.keys(c.kf).forEach((k) => { c.kf[k] = c.kf[k].map((p) => ({ t: p.t - delta, v: p.v })).filter((p) => p.t >= -0.0001 || true); }); }
 function srcLen(c) { return c.dur * c.speed; }
 function maxSrcDur(c) { const m = getMedia(c); return (m && (c.type === 'video' || c.type === 'audio') && m.dur) ? m.dur : Infinity; }
 
@@ -85,6 +112,15 @@ function transDur(c, prev) {
   if (!c.trans || c.trans.id === 'none' || !prev) return 0;
   return Math.max(0.1, Math.min(c.trans.dur, prev.dur * 0.98, c.dur * 0.98));
 }
+
+/* ---------- magnetyczna ścieżka główna: klipy zawsze stykają się bez luk ---------- */
+function packMain(byCenter) {
+  if (!S.magnet) return;
+  const lc = clips.filter((c) => c.lane === 'v1').sort((a, b) => (byCenter ? (a.start + a.dur / 2) - (b.start + b.dur / 2) : a.start - b.start));
+  let t = 0;
+  for (const c of lc) { c.start = t; t += c.dur; }
+}
+const isLocked = (laneId) => !!(P.lanes && P.lanes.locked && P.lanes.locked[laneId]);
 
 /* ---------- umieszczanie klipów bez nakładania ---------- */
 function resolveStart(c, laneId, desired, dur) {
@@ -121,7 +157,8 @@ function addClip(c, select = true) {
 function removeClip(id) {
   const i = clips.findIndex((c) => c.id === id);
   if (i >= 0) clips.splice(i, 1);
-  if (S.sel === id) S.sel = null;
+  S.multi = (S.multi || []).filter((x) => x !== id);
+  if (S.sel === id) S.sel = S.multi.shift() || null;
 }
 function duplicateClip(c) {
   const d = clone(c); d.id = uid();
@@ -137,6 +174,7 @@ function splitClip(c, t) {
   b.start = t; b.dur = c.dur - d1; b.inPt = c.inPt + d1 * c.speed;
   b.trans = { id: 'none', dur: 0.7 };
   b.animIn = { id: 'none', dur: 0.6 };
+  kfShift(b, d1);
   c.dur = d1; c.animOut = { id: 'none', dur: 0.6 };
   clips.push(b);
   return b;
@@ -159,6 +197,7 @@ function trimLeft(c, newStart) {
     if (newIn < 0) { delta = -c.inPt / c.speed; ns = c.start + delta; }
     c.inPt = Math.max(0, c.inPt + delta * c.speed);
   }
+  if (c.kf) kfShift(c, ns - c.start);
   c.start = ns; c.dur = end - ns;
 }
 function trimRight(c, newEnd) {
@@ -205,6 +244,18 @@ function addStickerClip(emoji) {
   addClip(c);
   return c;
 }
+const OV_COLORS = { leakSweep: '#ffd9a0', edgeGlow: '#ff2d55', rays: '#fff0c8', flashColor: '#00e5ff', flickerLight: '#ffd36b', shockwave: '#ffffff', pulseRing: '#7be8ff', speedRadial: '#ffffff', speedH: '#ffffff', glitter: '#fff2b0', scanBar: '#7bffb0' };
+function addOverlayClip(id, start, dur) {
+  const def = OVERLAYS[id]; if (!def) return null;
+  const t = start == null ? clamp(S.time, 0, 3600) : start, d = dur || def.d, lane = freeOverlayLane(t, d);
+  const c = newClip('overlay', { lane, start: resolveStart({ id: '' }, lane, t, d), dur: d, overlay: { id, color: OV_COLORS[id] || '#ffffff', amt: 1, speed: 1, seed: 1 + Math.floor(Math.random() * 60) } });
+  addClip(c); return c;
+}
+function addShapeClip(shapeId) {
+  const t = clamp(S.time, 0, 3600), dur = 3, lane = freeOverlayLane(t, dur);
+  const c = newClip('sticker', { lane, start: resolveStart({ id: '' }, lane, t, dur), dur, sticker: { shape: shapeId, color: '#ffffff', size: 0.3 } });
+  c.animIn = { id: 'pop', dur: 0.5 }; addClip(c); return c;
+}
 function addFxLayer(patch) {
   const t = clamp(S.time, 0, 3600);
   const dur = 3;
@@ -219,6 +270,7 @@ function addFxLayer(patch) {
 const HIST = { undo: [], redo: [], last: '' };
 function snapshot() { return JSON.stringify({ P, clips }); }
 function commit() {
+  packMain();
   const s = snapshot();
   if (s !== HIST.last) {
     if (HIST.last) { HIST.undo.push(HIST.last); if (HIST.undo.length > 120) HIST.undo.shift(); }
@@ -232,6 +284,8 @@ function restore(s) {
   Object.assign(P, o.P);
   clips.length = 0; o.clips.forEach((c) => clips.push(c));
   if (S.sel && !byId(S.sel)) S.sel = null;
+  S.multi = (S.multi || []).filter((id) => byId(id));
+  if (!P.lanes) P.lanes = { hidden: {}, muted: {}, locked: {} };
   HIST.last = s;
   Bus.emit('change'); Bus.emit('project');
 }

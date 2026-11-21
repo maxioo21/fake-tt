@@ -10,7 +10,7 @@ const App = {
     toast(added.length === 1 ? 'Dodano do biblioteki: ' + added[0].name : 'Dodano do biblioteki: ' + added.length + ' pliki');
     if (S.demo) {   /* pierwszy własny import zastępuje projekt przykładowy (przykładowe pliki zostają w bibliotece) */
       clips.length = 0; S.sel = null; S.time = 0; S.demo = false;
-      Object.assign(P, { name: 'Mój film', aspect: '16:9', fps: 30, bg: '#000000', bgBlur: false, markers: [] });
+      Object.assign(P, { name: 'Mój film', aspect: '16:9', fps: 30, bg: '#000000', bgBlur: false, markers: [], lanes: { hidden: {}, muted: {}, locked: {} } });
       resetHistory();
     }
     if (!clips.length) { added.forEach((m) => addMediaClip(m, { keepAspect: false })); commit(); Engine.setupRenderer(); Engine.seek(0); }
@@ -31,8 +31,8 @@ const App = {
   addSticker(e) { addStickerClip(e); UI.insTab = 'basic'; commit(); },
   newProject() {
     Engine.pause();
-    Object.assign(P, { name: 'Mój film', aspect: '16:9', fps: 30, bg: '#000000', bgBlur: false, markers: [] });
-    clips.length = 0; S.sel = null; S.time = 0; S.demo = false;
+    Object.assign(P, { name: 'Mój film', aspect: '16:9', fps: 30, bg: '#000000', bgBlur: false, markers: [], lanes: { hidden: {}, muted: {}, locked: {} } });
+    clips.length = 0; S.sel = null; S.multi = []; S.time = 0; S.demo = false;
     resetHistory(); Bus.emit('change'); Bus.emit('project'); Engine.setupRenderer(); Engine.invalidate();
     UI.openTab('media');
   },
@@ -64,8 +64,12 @@ const Tools = {
 
   /* rytm: znaczniki na uderzeniach muzyki */
   beats() {
-    const c = byId(S.sel), m = getMedia(c);
-    if (!c || !m || !m.peaks) { toast('Zaznacz klip audio (lub wideo z dźwiękiem). Fala dźwięku musi się najpierw wczytać.'); return; }
+    let c = byId(S.sel), m = getMedia(c);
+    if (!c || !m || !m.peaks) {   /* bez zaznaczenia szukamy muzyki na osi */
+      c = clips.find((q) => q.type === 'audio' && getMedia(q) && getMedia(q).peaks) || clips.find((q) => q.type === 'video' && getMedia(q) && getMedia(q).peaks);
+      m = getMedia(c);
+    }
+    if (!c || !m || !m.peaks) { toast('Dodaj muzykę (klip audio) lub wideo z dźwiękiem. Fala dźwięku musi się najpierw wczytać.'); return; }
     const pk = m.peaks, n = pk.length, env = new Float32Array(n);
     for (let i = 0; i < n; i++) { let s = 0, k = 0; for (let j = i - 2; j <= i + 2; j++) if (j >= 0 && j < n) { s += pk[j]; k++; } env[i] = s / k; }
     const flux = new Float32Array(n);
@@ -261,7 +265,7 @@ const Demo = {
       ms.push(await importFile(new File([blob], 'Przykład – ' + names[i], { type: 'image/png' }), { gen: true }));
     }
     const au = await importFile(new File([this.wav()], 'Przykład – beat.wav', { type: 'audio/wav' }), { gen: true });
-    clips.length = 0; P.aspect = '16:9'; P.name = 'Przykładowy projekt'; P.markers = [];
+    clips.length = 0; P.aspect = '16:9'; P.name = 'Przykładowy projekt'; P.markers = []; P.lanes = { hidden: {}, muted: {}, locked: {} };
     const mk = (m, i) => { const c = newClip('image', { lane: 'v1', media: m.id, start: i * 4, dur: 4 }); clips.push(c); return c; };
     const a = mk(ms[0], 0), b = mk(ms[1], 1), c = mk(ms[2], 2);
     a.animLoop = { id: 'kbIn', amt: 1 }; a.animOut = { id: 'none', dur: 0.6 };
@@ -273,7 +277,8 @@ const Demo = {
     t2.animIn = { id: 'slideL', dur: 0.5 }; clips.push(t2);
     const st = newClip('sticker', { lane: 'v2', start: 9, dur: 2.6, x: 0.3, y: -0.2, sticker: { emoji: '🔥', size: 0.3 } });
     st.animIn = { id: 'elastic', dur: 0.7 }; st.animLoop = { id: 'heart', amt: 1 }; clips.push(st);
-    const fx = newClip('fx', { lane: 'v3', start: 8.2, dur: 3.8, fx: [{ id: 'leak', amt: 0.5 }] }); clips.push(fx);
+    const fx = addOverlayClip('leakWarm', 8.2, 3.8); fx.lane = 'v3'; fx.overlay.amt = 0.8;
+    const hit = addOverlayClip('flashWhite', 4, 0.4); hit.lane = 'v3'; hit.start = 3.8;
     const m1 = newClip('audio', { lane: 'a1', media: au.id, start: 0, dur: 12, vol: 0.7, fadeOut: 1.5 }); clips.push(m1);
     S.sel = null; S.time = 1.2; S.demo = true;
     resetHistory(); Bus.emit('change'); Bus.emit('project'); Engine.setupRenderer(); Engine.invalidate();

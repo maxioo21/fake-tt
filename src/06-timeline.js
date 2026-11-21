@@ -22,7 +22,8 @@ const TL = {
       tb('music', 'Odłącz dźwięk od wideo', () => Act.detach(), 'bDetach'),
       tb('freeze', 'Zatrzymaj klatkę', () => Act.freeze(), 'bFreeze'),
       tb('flag', 'Dodaj znacznik (M)', () => Act.marker(), 'bMarker'),
-      tb('magnet', 'Przyciąganie do krawędzi', () => { S.snap = !S.snap; this.syncBar(); }, 'bSnap'),
+      tb('magnet', 'Przyciąganie do krawędzi i znaczników', () => { S.snap = !S.snap; this.syncBar(); }, 'bSnap'),
+      tb('link', 'Magnetyczna ścieżka główna (bez luk, jak w CapCut)', () => { S.magnet = !S.magnet; if (S.magnet) commit(); this.syncBar(); toast(S.magnet ? 'Ścieżka główna: klipy stykają się bez luk' : 'Ścieżka główna: swobodne ułożenie klipów'); }, 'bMag'),
       h('span', { class: 'grow' }),
       tb('zoomOut', 'Oddal oś (−)', () => this.setZoom(S.zoom / 1.35)),
       h('input', { type: 'range', id: 'zoomRange', min: '0', max: '100', value: '50', 'aria-label': 'Powiększenie osi czasu', oninput: (e) => this.setZoom(Math.exp(lerp(Math.log(12), Math.log(500), e.target.value / 100)), true) }),
@@ -40,7 +41,8 @@ const TL = {
     this.content.append(this.ruler, this.lanesBox, this.head);
     /* etykiety ścieżek */
     this.labels.append(h('div', { class: 'lbl-ruler' }));
-    LANES.forEach((l) => this.labels.append(h('div', { class: 'lbl ' + l.kind, style: `height:${this.LANE_H[l.id]}px`, title: l.label }, h('span', {}, l.label))));
+    this.lblEls = {};
+    LANES.forEach((l) => { const el = h('div', { class: 'lbl ' + l.kind, style: `height:${this.LANE_H[l.id]}px`, title: l.label }); this.lblEls[l.id] = el; this.labels.append(el); });
     LANES.forEach((l) => {
       const el = h('div', { class: 'lane ' + l.kind, 'data-lane': l.id, style: `height:${this.LANE_H[l.id]}px` });
       el.addEventListener('dragover', (e) => { if ([...e.dataTransfer.types].includes('text/kadr-media')) { e.preventDefault(); el.classList.add('drop'); } });
@@ -64,6 +66,25 @@ const TL = {
     this.setZoom(S.zoom, false, true);
   },
 
+  renderLabels() {
+    LANES.forEach((l) => {
+      const el = this.lblEls[l.id]; el.innerHTML = '';
+      const st = P.lanes || { hidden: {}, muted: {}, locked: {} };
+      const btn = (ic, title, on, fn) => h('button', { class: 'lb' + (on ? ' on' : ''), title, onclick: fn, html: icon(ic, 12) });
+      const tog = (k) => () => { if (!P.lanes) P.lanes = { hidden: {}, muted: {}, locked: {} }; P.lanes[k][l.id] = !P.lanes[k][l.id]; commit(); };
+      el.append(h('span', { class: 'ln' }, l.label), h('span', { class: 'lbs' },
+        l.kind === 'v' ? btn(st.hidden[l.id] ? 'eyeOff' : 'eye', st.hidden[l.id] ? 'Pokaż ścieżkę' : 'Ukryj ścieżkę', st.hidden[l.id], tog('hidden')) : btn(st.muted[l.id] ? 'volumeX' : 'volume', st.muted[l.id] ? 'Włącz dźwięk ścieżki' : 'Wycisz ścieżkę', st.muted[l.id], tog('muted')),
+        btn(st.locked[l.id] ? 'lock' : 'unlock', st.locked[l.id] ? 'Odblokuj ścieżkę' : 'Zablokuj ścieżkę', st.locked[l.id], tog('locked'))));
+      el.classList.toggle('off', !!(st.hidden[l.id] || st.muted[l.id]));
+      this.lanes[l.id] && this.lanes[l.id].classList.toggle('locked', !!st.locked[l.id]);
+      this.lanes[l.id] && this.lanes[l.id].classList.toggle('hid', !!st.hidden[l.id]);
+    });
+  },
+  showGuide(t) {
+    if (!this.guide) { this.guide = h('div', { class: 'snapline' }); this.content.append(this.guide); }
+    if (t == null) { this.guide.style.display = 'none'; return; }
+    this.guide.style.display = 'block'; this.guide.style.left = this.px(t) + 'px';
+  },
   px(t) { return t * S.zoom; },
   setZoom(z, fromSlider, noRender) {
     const old = S.zoom;
@@ -87,6 +108,7 @@ const TL = {
     set('bSplit', !!sel); set('bDel', !!sel); set('bDup', !!sel);
     set('bDetach', !!sel && sel.type === 'video'); set('bFreeze', !!sel && sel.type === 'video');
     const sn = $('#bSnap'); if (sn) sn.classList.toggle('on', S.snap);
+    const mg = $('#bMag'); if (mg) mg.classList.toggle('on', S.magnet);
   },
 
   /* ---------- rysowanie ---------- */
@@ -118,6 +140,7 @@ const TL = {
         onclick: (e) => { e.stopPropagation(); S.sel = c.id; Bus.emit('select'); UI.openTab('trans'); this.render(); } });
       this.lanes[c.lane].append(j);
     }
+    this.renderLabels();
     this.syncBar();
     this.updateHead();
   },
@@ -136,21 +159,22 @@ const TL = {
   },
   clipLabel(c) {
     if (c.type === 'text') return c.text.str.replace(/\n/g, ' ');
-    if (c.type === 'sticker') return c.sticker.emoji;
+    if (c.type === 'sticker') return c.sticker.shape ? (SHAPES[c.sticker.shape] || {}).name || 'Kształt' : c.sticker.emoji;
+    if (c.type === 'overlay') return (OVERLAYS[c.overlay && c.overlay.id] || {}).name || 'Nakładka';
     if (c.type === 'fx') return c.fx.length ? c.fx.map((e) => (FX[e.id] || {}).name).join(' + ') : ((FILTERS[c.filter.id] || {}).name !== 'Brak' ? (FILTERS[c.filter.id] || {}).name : 'Efekt / filtr');
     const m = getMedia(c); return m ? m.name : '';
   },
   clipEl(c) {
     const left = this.px(c.start), w = Math.max(6, this.px(c.dur));
-    const sel = c.id === S.sel;
-    const el = h('div', { class: `clip ${c.type}${sel ? ' sel' : ''}`, 'data-id': c.id, style: `left:${left}px;width:${w}px` });
+    const sel = c.id === S.sel, msel = S.multi && S.multi.includes(c.id);
+    const el = h('div', { class: `clip ${c.type}${sel ? ' sel' : ''}${msel ? ' msel' : ''}`, 'data-id': c.id, style: `left:${left}px;width:${w}px` });
     const m = getMedia(c);
     if (c.type === 'video' && m && m.strip) {
       const seg = srcLen(c), bgW = (m.dur / seg) * w;
       el.append(h('div', { class: 'bg', style: `background-image:url(${m.strip});background-size:${bgW}px 100%;background-position:${-(c.inPt / m.dur) * bgW}px 0` }));
     } else if (c.type === 'image' && m) {
       el.append(h('div', { class: 'bg', style: `background-image:url(${m.thumb});background-size:auto 100%;background-repeat:repeat-x` }));
-    } else if (c.type === 'audio' || (c.type === 'video' && false)) {
+    } else if (c.type === 'audio') {
       const cv = h('canvas', { class: 'wave' });
       el.append(cv);
       requestAnimationFrame(() => this.drawWave(cv, c, w));
@@ -160,16 +184,22 @@ const TL = {
     if (c.mute) tags.push('🔇');
     if (c.fx.length && c.type !== 'fx') tags.push('✦');
     if (c.cut.mode !== 'none') tags.push('✂');
+    if (c.curve && c.curve !== 'none') tags.push('⚡');
+    if (c.blend && c.blend !== 'normal') tags.push('◐');
+    if (c.mask && c.mask.id !== 'none') tags.push('◍');
     el.append(h('div', { class: 'lab' }, h('span', { class: 'ico', html: this.typeIcon(c) }), h('span', { class: 't' }, this.clipLabel(c)), tags.length ? h('span', { class: 'tags' }, tags.join(' ')) : null));
+    if (c.type === 'video' && m && m.peaks) { const cv = h('canvas', { class: 'wave v' }); el.append(cv); requestAnimationFrame(() => this.drawWave(cv, c, w, true)); }
+    if (c.kf) { const seen = new Set(); Object.values(c.kf).forEach((pts) => pts.forEach((p) => { const k = Math.round(p.t * 100); if (seen.has(k)) return; seen.add(k); el.append(h('i', { class: 'kfd', style: `left:${this.px(p.t)}px` })); })); }
     el.append(h('div', { class: 'handle l', 'data-h': 'l' }), h('div', { class: 'handle r', 'data-h': 'r' }));
     return el;
   },
   typeIcon(c) {
-    return icon({ video: 'video', image: 'image', audio: 'music', text: 'type', sticker: 'smile', fx: 'sparkles' }[c.type] || 'film', 12);
+    return icon({ video: 'video', image: 'image', audio: 'music', text: 'type', sticker: 'smile', fx: 'sparkles', overlay: 'layers' }[c.type] || 'film', 12);
   },
-  drawWave(cv, c, w) {
+  drawWave(cv, c, w, small) {
     const m = getMedia(c); if (!m || !m.peaks) { cv.width = 2; return; }
-    const Hh = cv.parentElement ? cv.parentElement.clientHeight || 34 : 34;
+    let Hh = cv.parentElement ? cv.parentElement.clientHeight || 34 : 34;
+    if (small) Hh = Math.max(10, Math.round(Hh * 0.36));
     cv.width = Math.min(4096, Math.ceil(w)); cv.height = Hh; cv.style.width = w + 'px';
     const x = cv.getContext('2d'), pk = m.peaks, s0 = c.inPt * 100, per = (srcLen(c) * 100) / cv.width;
     x.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--wave').trim() || '#7fe3b0';
@@ -217,14 +247,19 @@ const TL = {
       return;
     }
     const c = byId(clipEl.dataset.id); if (!c) return;
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      if (!S.sel) S.sel = c.id; else if (c.id !== S.sel) { const i = S.multi.indexOf(c.id); if (i >= 0) S.multi.splice(i, 1); else S.multi.push(c.id); }
+      Bus.emit('select'); this.syncSel(); e.preventDefault(); return;
+    }
     const mode = e.target.dataset.h === 'l' ? 'trimL' : e.target.dataset.h === 'r' ? 'trimR' : 'move';
-    if (S.sel !== c.id) { S.sel = c.id; Bus.emit('select'); this.syncSel(); }
-    this.drag = { mode, c, id: c.id, el: clipEl, x0: e.clientX, y0: e.clientY, moved: false, o: { start: c.start, dur: c.dur, inPt: c.inPt, lane: c.lane }, lane: c.lane, tmp: null };
+    if (S.sel !== c.id) { S.sel = c.id; S.multi = []; Bus.emit('select'); this.syncSel(); }
+    if (isLocked(c.lane)) { e.preventDefault(); return; }
+    this.drag = { mode, c, id: c.id, el: clipEl, x0: e.clientX, y0: e.clientY, t0: this.timeAt(e.clientX), moved: false, o: { start: c.start, dur: c.dur, inPt: c.inPt, lane: c.lane }, lane: c.lane, tmp: null };
     clipEl.setPointerCapture && clipEl.setPointerCapture(e.pointerId);
     e.preventDefault();
   },
   syncSel() {
-    $$('.clip', this.content).forEach((el) => el.classList.toggle('sel', el.dataset.id === S.sel));
+    $$('.clip', this.content).forEach((el) => { el.classList.toggle('sel', el.dataset.id === S.sel); el.classList.toggle('msel', S.multi.includes(el.dataset.id)); });
     this.syncBar();
   },
   onMove(e) {
@@ -237,14 +272,13 @@ const TL = {
     const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
     if (!d.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
     if (!d.moved) { d.moved = true; d.el.classList.add('dragging'); }
-    const c = d.c, o = d.o, dt = dx / S.zoom, thr = 9 / S.zoom, pts = S.snap ? this.snapPts(c.id) : [];
+    const r0 = this.scroll.getBoundingClientRect();
+    if (e.clientX > r0.right - 40) this.scroll.scrollLeft += 16; else if (e.clientX < r0.left + 40) this.scroll.scrollLeft -= 16;
+    const c = d.c, o = d.o, dt = this.timeAt(e.clientX) - d.t0, thr = 9 / S.zoom, pts = S.snap ? this.snapPts(c.id) : [];
+    let guide = null;
     if (d.mode === 'move') {
       let s = Math.max(0, o.start + dt);
-      if (S.snap) {
-        const s1 = this.snapTo(s, pts, thr), s2 = this.snapTo(s + o.dur, pts, thr) - o.dur;
-        s = Math.abs(s1 - s) <= Math.abs(s2 - s) ? s1 : s2;
-        if (Math.abs(s1 - (o.start + dt)) >= thr && Math.abs(s2 - (o.start + dt)) >= thr) s = Math.max(0, o.start + dt);
-      }
+      if (S.snap) { let best = thr, bs = s; for (const p of pts) { const d1 = Math.abs(p - s); if (d1 < best) { best = d1; bs = p; guide = p; } const d2 = Math.abs(p - (s + o.dur)); if (d2 < best) { best = d2; bs = p - o.dur; guide = p; } } s = Math.max(0, bs); }
       let lane = o.lane;
       const la = this.laneAt(e.clientY);
       if (la && la.kind === laneKind(o.lane)) lane = la.id;
@@ -255,7 +289,7 @@ const TL = {
     } else if (d.mode === 'trimL') {
       c.start = o.start; c.dur = o.dur; c.inPt = o.inPt;
       let ns = o.start + dt;
-      if (S.snap) ns = this.snapTo(ns, pts, thr);
+      if (S.snap) { const q = this.snapTo(ns, pts, thr); if (q !== ns) guide = q; ns = q; }
       const prev = clips.filter((q) => q.lane === c.lane && q.id !== c.id && clipEnd(q) <= o.start + 1e-6).reduce((m, q) => Math.max(m, clipEnd(q)), 0);
       trimLeft(c, Math.max(prev, ns));
       d.el.style.left = this.px(c.start) + 'px'; d.el.style.width = Math.max(6, this.px(c.dur)) + 'px';
@@ -263,23 +297,26 @@ const TL = {
     } else if (d.mode === 'trimR') {
       c.start = o.start; c.dur = o.dur; c.inPt = o.inPt;
       let ne = o.start + o.dur + dt;
-      if (S.snap) ne = this.snapTo(ne, pts, thr);
+      if (S.snap) { const q = this.snapTo(ne, pts, thr); if (q !== ne) guide = q; ne = q; }
       const next = clips.filter((q) => q.lane === c.lane && q.id !== c.id && q.start >= clipEnd({ start: o.start, dur: o.dur }) - 1e-6).reduce((m, q) => Math.min(m, q.start), Infinity);
       trimRight(c, Math.min(next, ne));
       d.el.style.width = Math.max(6, this.px(c.dur)) + 'px';
       Engine.invalidate();
     }
+    this.showGuide(guide);
   },
   onUp() {
     const d = this.drag; if (!d) return;
     this.drag = null;
     if (d.mode === 'scrub') return;
     $$('.lane', this.lanesBox).forEach((l) => l.classList.remove('drop'));
+    this.showGuide(null);
     if (d.el) d.el.classList.remove('dragging');
     const c = d.c;
     if (d.moved) {
       if (d.mode === 'move') {
-        c.start = resolveStart(c, d.lane, d.start); c.lane = d.lane;
+        if (S.magnet && d.lane === 'v1') { c.lane = 'v1'; c.start = d.start; packMain(true); }
+        else { c.start = resolveStart(c, d.lane, d.start); c.lane = d.lane; }
       } else if (d.mode === 'trimL' || d.mode === 'trimR') {
         if (c.type === 'video' || c.type === 'audio') { c.dur = Math.max(0.1, c.dur); }
       }
@@ -303,6 +340,22 @@ const TL = {
    ============================================================ */
 const Act = {
   sel() { return byId(S.sel); },
+  ids() { return [...new Set([S.sel, ...(S.multi || [])].filter((id) => id && byId(id)))]; },
+  all() { return this.ids().map(byId); },
+  copy() {
+    const list = this.all(); if (!list.length) { toast('Zaznacz klip, który chcesz skopiować'); return; }
+    this.clip = clone(list); toast(list.length > 1 ? 'Skopiowano ' + list.length + ' klipy' : 'Skopiowano klip');
+  },
+  paste() {
+    if (!this.clip || !this.clip.length) { toast('Schowek jest pusty. Najpierw skopiuj klip (Ctrl+C).'); return; }
+    const minS = Math.min(...this.clip.map((c) => c.start)), ids = [];
+    for (const src of this.clip) {
+      const c = clone(src); c.id = uid(); c.trans = { id: 'none', dur: 0.7 };
+      c.start = resolveStart(c, c.lane, S.time + (src.start - minS)); clips.push(c); ids.push(c.id);
+    }
+    S.sel = ids[0]; S.multi = ids.slice(1); commit();
+  },
+  selectAll() { const l = clips.map((c) => c.id); if (!l.length) return; S.sel = l[0]; S.multi = l.slice(1); Bus.emit('select'); TL.render(); },
   split() {
     const c = this.sel(); const t = S.time;
     let target = c && t > c.start + 0.05 && t < clipEnd(c) - 0.05 ? c : null;
@@ -313,8 +366,8 @@ const Act = {
     const b = splitClip(target, t);
     if (b) { S.sel = b.id; commit(); }
   },
-  del() { const c = this.sel(); if (!c) return; removeClip(c.id); commit(); },
-  dup() { const c = this.sel(); if (!c) return; duplicateClip(c); commit(); },
+  del() { const ids = this.ids(); if (!ids.length) return; ids.forEach((id) => removeClip(id)); S.multi = []; commit(); },
+  dup() { const list = this.all(); if (!list.length) return; list.forEach((c) => duplicateClip(c)); S.multi = []; commit(); },
   marker() {
     const t = Math.round(S.time * 100) / 100;
     const i = P.markers.findIndex((m) => Math.abs(m - t) < 0.05);

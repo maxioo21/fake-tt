@@ -114,7 +114,7 @@ const Exporter = {
   /* ---------- miks dźwięku (offline) ---------- */
   async mixAudio(dur) {
     const sr = 48000;
-    const list = clips.filter((c) => (c.type === 'audio' || c.type === 'video') && !c.mute && c.vol > 0 && getMedia(c) && getMedia(c).hasAudio !== false);
+    const list = clips.filter((c) => (c.type === 'audio' || c.type === 'video') && !c.mute && c.vol > 0 && !(P.lanes && P.lanes.muted && P.lanes.muted[c.lane]) && getMedia(c) && getMedia(c).hasAudio !== false);
     if (!list.length) return null;
     const ctx = new OfflineAudioContext(2, Math.max(1, Math.ceil(dur * sr)), sr), cache = new Map();
     let used = 0;
@@ -127,6 +127,8 @@ const Exporter = {
       }
       const buf = cache.get(m.id); if (!buf) continue;
       const src = ctx.createBufferSource(); src.buffer = buf; src.playbackRate.value = c.speed;
+      const cf = c.curve && c.curve !== 'none' ? curveFns(c.curve) : null;
+      if (cf) { src.playbackRate.setValueAtTime(clamp(c.speed * cf.m(0), 0.0625, 16), c.start); for (let k = 1; k <= 48; k++) src.playbackRate.linearRampToValueAtTime(clamp(c.speed * cf.m(k / 48), 0.0625, 16), c.start + c.dur * k / 48); }
       const g = ctx.createGain(), t0 = c.start;
       const fi = Math.min(c.fadeIn, c.dur / 2), fo = Math.min(c.fadeOut, c.dur / 2);
       if (fi > 0) { g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(c.vol, t0 + fi); } else g.gain.setValueAtTime(c.vol, t0);

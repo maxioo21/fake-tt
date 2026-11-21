@@ -40,6 +40,9 @@ function bindGlobal() {
     else if (mod && (k === 'y' || k === 'Y')) { e.preventDefault(); redo(); }
     else if (mod && (k === 'd' || k === 'D')) { e.preventDefault(); Act.dup(); }
     else if (mod && (k === 'e' || k === 'E')) { e.preventDefault(); Exporter.open(); }
+    else if (mod && (k === 'c' || k === 'C')) { e.preventDefault(); Act.copy(); }
+    else if (mod && (k === 'v' || k === 'V')) { e.preventDefault(); Act.paste(); }
+    else if (mod && (k === 'a' || k === 'A')) { e.preventDefault(); Act.selectAll(); }
     else if (!mod && (k === 's' || k === 'S')) { Act.split(); }
     else if (!mod && (k === 'm' || k === 'M')) { Act.marker(); }
     else if (k === 'Delete' || k === 'Backspace') { if (S.sel) { e.preventDefault(); Act.del(); } }
@@ -49,7 +52,7 @@ function bindGlobal() {
     else if (k === 'End') { Engine.seek(projectDuration()); }
     else if (k === '+' || k === '=') { TL.setZoom(S.zoom * 1.25); }
     else if (k === '-' || k === '_') { TL.setZoom(S.zoom / 1.25); }
-    else if (k === 'Escape') { if (S.sel) { S.sel = null; Bus.emit('select'); TL.render(); } }
+    else if (k === 'Escape') { if (S.sel) { S.sel = null; S.multi = []; Bus.emit('select'); TL.render(); } }
   });
 
   /* przeciąganie plików z komputera */

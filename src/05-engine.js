@@ -120,7 +120,7 @@ const Engine = {
       const inside = t >= c.start && t < clipEnd(c);
       /* głośność */
       let vol = 0;
-      if (inside && !c.mute) {
+      if (inside && !c.mute && !(P.lanes && P.lanes.muted && P.lanes.muted[c.lane])) {
         vol = c.vol;
         const lt = t - c.start;
         if (c.fadeIn > 0 && lt < c.fadeIn) vol *= lt / c.fadeIn;
@@ -129,7 +129,7 @@ const Engine = {
       el.volume = clamp(vol, 0, 1);
       if (c.type === 'video') el.muted = (vol <= 0.001) || !S.playing;
       if (S.playing && inside) {
-        const rate = clamp(c.speed, 0.0625, 16);
+        const rate = clamp(speedAt(c, t), 0.0625, 16);
         if (Math.abs(el.playbackRate - rate) > 0.001) el.playbackRate = rate;
         if (el.paused) { if (Math.abs(el.currentTime - target) > 0.08) el.currentTime = target; el.play().catch(() => {}); }
         else if (Math.abs(el.currentTime - target) > 0.35) el.currentTime = target;
@@ -141,6 +141,17 @@ const Engine = {
     }
   },
 
+  /* czy któryś aktywny klip wideo czeka na dane (wtedy zatrzymujemy zegar, żeby obraz nie uciekał dźwiękowi) */
+  stalled() {
+    const t = S.time;
+    for (const c of clips) {
+      if (c.type !== 'video' || t < c.start || t >= clipEnd(c)) continue;
+      const e = this.els.get(c.id);
+      if (e && e.el.readyState < 2 && !e.el.error) return true;
+    }
+    return false;
+  },
+
   /* ---------- pętla ---------- */
   start() {
     const loop = (ts) => {
@@ -148,7 +159,7 @@ const Engine = {
       if (S.playing) {
         if (!this.lastTs) this.lastTs = ts;
         const dt = Math.min(0.2, (ts - this.lastTs) / 1000); this.lastTs = ts;
-        S.time += dt;
+        if (this.stalled() && (this.stallT = this.stallT || ts) && ts - this.stallT < 2500) { /* buforowanie */ } else { this.stallT = 0; S.time += dt; }
         const dur = projectDuration();
         if (S.time >= dur) { S.time = dur; this.pause(); Bus.emit('time'); }
         else if (S.stopAt != null && S.time >= S.stopAt) { S.stopAt = null; this.pause(); Bus.emit('time'); }
@@ -157,7 +168,13 @@ const Engine = {
       if (S.playing || this.dirty || this._pendingSeek) { this._pendingSeek = false; this.sync(); }
       if (this.dirty && this.R) {
         this.dirty = false;
+        const r0 = performance.now();
         try { this.R.render(S.time); } catch (e) { console.error('render', e); }
+        const ms = performance.now() - r0; this.ema = this.ema ? this.ema * 0.9 + ms * 0.1 : ms;
+        if (S.playing && S.autoQ !== false && this.ema > 36 && S.previewScale > 0.5 && ts - (this.lastDown || 0) > 2500) {
+          this.lastDown = ts; S.previewScale = Math.max(0.5, S.previewScale - 0.25); this.ema = 0; this.setupRenderer();
+          toast('Obniżyłem jakość podglądu, żeby odtwarzanie było płynne (eksport zachowa pełną jakość)');
+        }
         if (S.playing || ts - this.uiTick > 80) { this.uiTick = ts; Bus.emit('time'); }
       } else if (S.playing && ts - this.uiTick > 60) { this.uiTick = ts; Bus.emit('time'); }
     };
