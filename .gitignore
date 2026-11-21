@@ -3,3 +3,7 @@ dist/
 release/
 *.zip
 .DS_Store
+release-dl/
+*.exe
+*.dmg
+*.AppImage
