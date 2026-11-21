@@ -89,7 +89,7 @@ function syncTop() {
 }
 
 async function boot() {
-  UI.init(); TL.init(); Stage.init(); Transport.init();
+  UI.init(); TL.init(); Stage.init(); Transport.init(); DND.init();
   $('#expBtn').addEventListener('click', () => Exporter.open());
   $('#newBtn').addEventListener('click', () => confirmDlg('Nowy projekt', 'Obecny projekt zostanie wyczyszczony (biblioteka plików zostaje). Kontynuować?', 'Nowy projekt', () => App.newProject()));
   $('#projBtn').addEventListener('click', () => { S.sel = null; Bus.emit('select'); TL.render(); UI.openTab('inspect'); if (!document.body.dataset.mobile) UI.openTab(S.tab === 'inspect' ? 'media' : S.tab); });

@@ -88,7 +88,7 @@ UI.pText = function (box) {
       const sp = makeTextSprite(T, hh * 1.2, hh * 1.2, null);
       const k = Math.min((w - 14) / sp.width, (hh - 10) / sp.height, 1.2);
       x.drawImage(sp, (w - sp.width * k) / 2, (hh - sp.height * k) / 2, sp.width * k, sp.height * k);
-    }, { anim: false, onclick: () => App.addText(null, s.t) }));
+    }, { anim: false, drag: { kind: 'text', style: s.t }, onclick: () => App.addText(null, s.t) }));
   });
   box.append(grid);
 };
@@ -109,13 +109,13 @@ UI.pStickers = function (box) {
         x.fillStyle = '#23262f'; x.fillRect(0, 0, w, hh);
         const sp = makeShapeSprite({ shape: s.id, color: S.shapeColor, size: 0.6 }, hh, hh), k = Math.min(1, (hh - 8) / sp.height);
         x.drawImage(sp, (w - sp.width * k) / 2, (hh - sp.height * k) / 2, sp.width * k, sp.height * k);
-      }, { anim: false, onclick: () => { const c = addShapeClip(s.id); c.sticker.color = S.shapeColor; UI.insTab = 'basic'; commit(); } })));
+      }, { anim: false, drag: { kind: 'shape', id: s.id }, onclick: () => { const c = addShapeClip(s.id); c.sticker.color = S.shapeColor; UI.insTab = 'basic'; commit(); } })));
       box.append(g);
     });
     box.append(F.hint('Kształty możesz przesuwać, skalować i obracać na podglądzie. Kolor zmienisz w „Edytuj → Podstawowe”.'));
     return;
   }
-  box.append(h('div', { class: 'egrid' }, EMOJI[cur].map((e) => h('button', { class: 'emo', onclick: () => App.addSticker(e) }, e))));
+  box.append(h('div', { class: 'egrid' }, EMOJI[cur].map((e) => { const b = h('button', { class: 'emo', title: 'Kliknij lub przeciągnij na podgląd / oś czasu', onclick: () => App.addSticker(e) }, e); DND.attach(b, { kind: 'sticker', emoji: e, name: e }); return b; })));
   box.append(F.hint('Kliknij naklejkę, aby dodać ją do filmu. Przesuwaj, skaluj i obracaj ją bezpośrednio na podglądzie.'));
 };
 
@@ -126,7 +126,7 @@ UI.readyTab = 'looks';
 UI.catState.looks = 'Edit'; UI.catState.ovl = 'Światło'; UI.catState.pack = 'Popularne';
 UI.pReady = function (box) {
   box.append(h('div', { class: 'p-head' }, h('h3', {}, 'Gotowe')),
-    F.hint('Gotowe efekty do edytów: jeden klik i masz look, prędkość, nakładki albo cały montaż na bit. Bez napisów.'));
+    F.hint('Gotowe efekty do edytów. Kliknij kafelek albo przeciągnij go na klip na osi lub na podgląd. Bez napisów.'));
   const subs = [['looks', 'Looki'], ['speed', 'Prędkość'], ['beat', 'Montaż na bit'], ['ovl', 'Nakładki'], ['pack', 'Przejścia']];
   box.append(h('div', { class: 'sub' }, subs.map(([id, t]) => h('button', { class: this.readyTab === id ? 'on' : '', onclick: () => { this.readyTab = id; this.renderPanel(); } }, t))));
   ({ looks: this.rLooks, speed: this.rSpeed, beat: this.rBeat, ovl: this.rOverlays, pack: this.rPack }[this.readyTab]).call(this, box);
@@ -152,7 +152,7 @@ UI.rLooks = function (box) {
       x.save(); x.beginPath(); x.rect(w * 0.4, 0, w * 0.6, hh); x.clip(); x.drawImage(cv, 0, 0); x.restore(); POOL.free(cv);
       x.fillStyle = 'rgba(255,255,255,.9)'; x.fillRect(w * 0.4 - 1, 0, 2, hh);
       if (fake.curve && fake.curve !== 'none') { x.fillStyle = 'rgba(0,0,0,.65)'; x.fillRect(w - 30, 4, 26, 15); x.fillStyle = '#ffb454'; x.font = '700 11px sans-serif'; x.fillText('⚡', w - 25, 16); }
-    }, { onclick: () => Looks.apply(l) }));
+    }, { drag: { kind: 'look', id: l.id }, onclick: () => Looks.apply(l) }));
   });
   box.append(grid, F.btn('Usuń look z klipów', () => Looks.clear(), 'block', 'x'));
 };
@@ -167,7 +167,7 @@ UI.rSpeed = function (box) {
       const f = curveFns(id) || null, N = 60; x.strokeStyle = id === 'none' ? '#6b7390' : '#a79bff'; x.lineWidth = 2.5; x.beginPath();
       for (let i = 0; i <= N; i++) { const u = i / N, m = f ? f.m(u) : 1, y = hh - 8 - clamp(m / 3.6, 0, 1) * (hh - 16); i ? x.lineTo(8 + u * (w - 16), y) : x.moveTo(8, y); }
       x.stroke();
-    }, { anim: false, active: ok && (sel.curve || 'none') === id, onclick: () => { if (!ok) { toast('Zaznacz klip wideo lub audio'); return; } sel.curve = id; commit(); Tools.previewClip(sel, 'loop'); } }));
+    }, { anim: false, drag: id === 'none' ? null : { kind: 'curve', id }, active: ok && (sel.curve || 'none') === id, onclick: () => { if (!ok) { toast('Zaznacz klip wideo lub audio'); return; } sel.curve = id; commit(); Tools.previewClip(sel, 'loop'); } }));
   });
   box.append(grid, F.hint('Krzywe działają jak „Prędkość → Krzywa” w CapCut. Dźwięk klipu zmienia tempo razem z obrazem.'));
 };
@@ -186,7 +186,7 @@ UI.rBeat = function (box) {
 UI.rOverlays = function (box) {
   const cats = OVERLAY_CATS, cur = this.catState.ovl;
   box.append(h('div', { class: 'chips' }, cats.map((k) => h('button', { class: 'chip' + (k === cur ? ' on' : ''), onclick: () => { this.catState.ovl = k; this.renderPanel(); } }, k))));
-  box.append(F.hint('Animowane nakładki rysowane na żywo. Kliknij, aby dodać na osi w miejscu głowicy. Tryb mieszania i kolor zmienisz w „Edytuj”.'));
+  box.append(F.hint('Animowane nakładki rysowane na żywo. Kliknij, aby dodać w miejscu głowicy, albo przeciągnij na wybraną ścieżkę lub podgląd. Kolor i tryb mieszania zmienisz w „Edytuj”.'));
   const grid = h('div', { class: 'tgrid' });
   Object.values(OVERLAYS).filter((o) => o.cat === cur).forEach((o) => {
     grid.append(tile(o.name, (x, w, hh, p, tm) => {
@@ -194,7 +194,7 @@ UI.rOverlays = function (box) {
       const ov = POOL.get(w, hh), lt = p == null ? Math.min(o.d * 0.18, 0.5) + 0.2 : (tm % Math.min(o.d, 3));
       drawOverlayTo(ov, o.id, lt, { color: OV_COLORS[o.id] || '#ffffff' });
       x.save(); x.globalCompositeOperation = blendOp(o.blend); x.drawImage(ov, 0, 0); x.restore(); POOL.free(ov);
-    }, { onclick: () => { addOverlayClip(o.id); UI.insTab = 'ovl'; commit(); toast('Dodano nakładkę „' + o.name + '”'); } }));
+    }, { drag: { kind: 'overlay', id: o.id }, onclick: () => { addOverlayClip(o.id); UI.insTab = 'ovl'; commit(); toast('Dodano nakładkę „' + o.name + '”'); } }));
   });
   box.append(grid);
 };
@@ -284,7 +284,7 @@ UI.insSpeed = function (b, c) {
     const f = curveFns(id), N = 50; x.strokeStyle = id === 'none' ? '#6b7390' : '#a79bff'; x.lineWidth = 2.5; x.beginPath();
     for (let i = 0; i <= N; i++) { const u = i / N, mm = f ? f.m(u) : 1, y = hh - 8 - clamp(mm / 3.6, 0, 1) * (hh - 16); i ? x.lineTo(8 + u * (w - 16), y) : x.moveTo(8, y); }
     x.stroke();
-  }, { anim: false, active: (c.curve || 'none') === id, onclick: () => { c.curve = id; commit(); } })));
+  }, { anim: false, drag: id === 'none' ? null : { kind: 'curve', id }, active: (c.curve || 'none') === id, onclick: () => { c.curve = id; commit(); } })));
   b.append(g);
 };
 const _oldText = UI.insText;

@@ -119,6 +119,7 @@ function tile(label, drawFn, o = {}) {
   const t = { draw: (p, tm) => { x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; x.filter = 'none'; x.clearRect(0, 0, TW, TH); try { drawFn(x, TW, TH, p, tm); } catch (e) { /* ignore */ } } };
   t.draw(null, 0.4);
   const el = h('button', { class: 'tile' + (o.active ? ' on' : ''), title: o.title || label, onclick: o.onclick }, cv, h('span', { class: 'tl' }, label));
+  if (o.drag) DND.attach(el, o.drag);
   if (o.anim !== false) {
     el.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') TileAnim.start(t); });
     el.addEventListener('pointerleave', () => TileAnim.stop());
@@ -132,7 +133,7 @@ function fxTile(id, active, onclick) {
   return tile(F0.name, (x, w, hh, p, tm) => {
     const cv = POOL.get(w, hh), cx = cv.getContext('2d'); cx.drawImage(sceneCanvases()[0], 0, 0);
     F0.fn(cv, 0.8, p == null ? st : st + tm); x.drawImage(cv, 0, 0); POOL.free(cv);
-  }, { active, onclick });
+  }, { active, onclick, drag: { kind: 'fx', id } });
 }
 const TRANS_PREVIEW_P = { dipblack: 0.32, dipwhite: 0.32, flashcut: 0.43, invert: 0.4, colorflash: 0.4, blink: 0.35, vflip: 0.3, flip: 0.3, static: 0.45, bounce: 0.3, flicker: 0.4, hueflash: 0.4, shatter: 0.4, zoomblur: 0.45 };
 function transTile(id, active, onclick) {
@@ -146,7 +147,7 @@ function transTile(id, active, onclick) {
       x.font = '800 11px sans-serif'; x.textAlign = 'center'; x.fillStyle = 'rgba(0,0,0,.6)'; x.fillRect(w - 46, hh - 18, 42, 14);
       x.fillStyle = '#fff'; x.fillText('A → B', w - 25, hh - 7);
     }
-  }, { active, onclick, title: T0.name + ' (najedź, aby zobaczyć przejście z A do B)' });
+  }, { active, onclick, drag: { kind: 'trans', id }, title: T0.name + ' (najedź: zobaczysz przejście A → B; przeciągnij na styk klipów)' });
 }
 function filterTile(id, active, onclick) {
   const F0 = FILTERS[id], fake = { adj: defAdj(), filter: { id, amt: 1 } };
@@ -161,7 +162,7 @@ function filterTile(id, active, onclick) {
     x.fillStyle = 'rgba(255,255,255,.9)'; x.fillRect(w / 2 - 1, 0, 2, hh);
     x.font = '800 10px sans-serif'; x.textAlign = 'center'; x.fillStyle = 'rgba(0,0,0,.55)'; x.fillRect(3, hh - 15, 30, 12); x.fillRect(w - 33, hh - 15, 30, 12);
     x.fillStyle = '#fff'; x.fillText('przed', 18, hh - 6); x.fillText('po', w - 18, hh - 6);
-  }, { active, onclick, anim: false, title: F0.name + ' (lewa połowa: oryginał, prawa: z filtrem)' });
+  }, { active, onclick, anim: false, drag: id === 'none' ? null : { kind: 'filter', id }, title: F0.name + ' (lewa połowa: oryginał, prawa: z filtrem; przeciągnij na klip)' });
 }
 /* animacje: w spoczynku 4 klatki (1→4) pokazują, jak zmienia się obraz; po najechaniu gra w pętli ze smugą */
 function animTile(dict, id, kind, active, onclick) {
@@ -200,7 +201,7 @@ function animTile(dict, id, kind, active, onclick) {
       put(stateAt(base), 1, 0, 0, w, hh);
       x.font = '800 9px sans-serif'; x.textAlign = 'left'; x.fillStyle = 'rgba(255,255,255,.55)'; x.fillText(kindLabel, 5, hh - 5);
     }
-  }, { active, onclick, title: A0.name + ' (' + kindLabel + '): kolejne klatki 1 → 4, najedź, aby zobaczyć ruch' });
+  }, { active, onclick, drag: { kind: 'anim', dict: kind, id }, title: A0.name + ' (' + kindLabel + '): kolejne klatki 1 → 4, najedź, aby zobaczyć ruch; przeciągnij na dowolny klip' });
 }
 
 /* ============================================================
@@ -325,7 +326,7 @@ const UI = {
         } else { const c = addFxLayer({ fx: [{ id: f.id, amt: 0.6 }] }); commit(); toast('Dodano warstwę efektu na osi'); }
       }));
     });
-    box.append(grid, F.hint('Najedź na kafelek, aby zobaczyć efekt w ruchu. Kliknij ponownie, aby go zdjąć z klipu.'));
+    box.append(grid, F.hint('Kliknij kafelek albo przeciągnij go na klip (na osi lub na podglądzie). Najedź, aby zobaczyć efekt w ruchu. Kliknij ponownie, aby zdjąć go z klipu.'));
   },
 
   /* ---------- Przejścia ---------- */
@@ -333,7 +334,7 @@ const UI = {
     box.append(h('div', { class: 'p-head' }, h('h3', {}, 'Przejścia')));
     const sel = byId(S.sel), prev = sel ? prevAdjacent(sel) : null;
     const ok = sel && prev && isVisual(sel) && sel.type !== 'fx';
-    box.append(h('div', { class: 'note' + (ok ? ' ok' : '') }, ok ? 'Przejście między „' + this.clipTitle(prev) + '” a „' + this.clipTitle(sel) + '”.' : 'Zaznacz klip, który styka się z poprzednim na tej samej ścieżce, albo kliknij „+” między klipami na osi.'));
+    box.append(h('div', { class: 'note' + (ok ? ' ok' : '') }, ok ? 'Przejście między „' + this.clipTitle(prev) + '” a „' + this.clipTitle(sel) + '”.' : 'Przeciągnij przejście na styk dwóch klipów na osi (lub na klip) albo zaznacz klip i kliknij kafelek. Można też kliknąć „+” między klipami.'));
     if (ok) box.append(F.slider('Czas trwania', () => sel.trans.dur, (v) => { sel.trans.dur = v; }, 0.2, 2.5, 0.1, (v) => v.toFixed(1) + ' s', () => this.previewTrans(sel)));
     box.append(this.chipsFor('trans', ['Popularne', 'Przesuwanie', 'Odsłanianie', 'Efekty']));
     const grid = h('div', { class: 'tgrid' });

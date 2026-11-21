@@ -28,6 +28,8 @@ npm run dist                  # instalator w katalogu release/
 ## Co potrafi
 
 **Edycja**
+- **Przeciąganie jak w CapCut:** efekty, filtry, animacje, przejścia, looki, krzywe prędkości, nakładki, napisy, naklejki i kształty możesz przeciągnąć na klip (na osi albo na podglądzie), na styk dwóch klipów (przejścia) albo na ścieżkę. Kursor pokazuje, co się stanie, a nieprawidłowy cel jest oznaczony na czerwono. Na telefonie dotknij kafelka.
+- **Menu pod prawym przyciskiem myszy** na klipie (podziel, duplikuj, kopiuj/wklej, odłącz dźwięk, zatrzymaj klatkę, usuń efekty…).
 - Oś czasu: 3 ścieżki wideo/nakładek + 2 ścieżki audio, **magnetyczna ścieżka główna** (klipy zawsze stykają się, przeciągnięcie zmienia kolejność, usunięcie zamyka lukę), przycinanie krawędzi, podział, duplikowanie, kopiuj/wklej, zaznaczanie wielu klipów (Shift/Ctrl), przyciąganie z widoczną prowadnicą, ukrywanie, wyciszanie i blokowanie ścieżek, cofnij/ponów.
 - **Klatki kluczowe** (pozycja, skala, obrót, krycie) i przeciąganie po podglądzie, które je zapisuje.
 - **Maski** (koło, serce, gwiazda, romb, pasy…), **tryby mieszania** (15), przycinanie, odbicia.
