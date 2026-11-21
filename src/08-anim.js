@@ -20,14 +20,14 @@ const Anim = (() => {
   const ry = (p, a) => { const c = cos(a), s = sin(a); return [p[0] * c + p[2] * s, p[1], -p[0] * s + p[2] * c]; };
   const rz = (p, a) => { const c = cos(a), s = sin(a); return [p[0] * c - p[1] * s, p[0] * s + p[1] * c, p[2]]; };
   const angMix = (a, b, k) => { let d = ((b - a + PI) % (2 * PI) + 2 * PI) % (2 * PI) - PI; return a + d * k; };
-  const hex = (c) => { c = String(c || '#888888').replace('#', ''); if (c.length === 3) c = c.split('').map((x) => x + x).join(''); const n = parseInt(c, 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+  const hex = (c) => { c = String(c || '#888888'); const rm = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(c); if (rm) return [+rm[1], +rm[2], +rm[3]]; c = c.replace('#', ''); if (c.length === 3) c = c.split('').map((x) => x + x).join(''); const n = parseInt(c, 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
   const mixc = (a, b, k) => { const x = hex(a), y = hex(b); return `rgb(${Math.round(mix(x[0], y[0], k))},${Math.round(mix(x[1], y[1], k))},${Math.round(mix(x[2], y[2], k))})`; };
 
   /* ---------- szkielet ---------- */
   const B = { hip: 0.93, spine: 0.52, neck: 0.1, headR: 0.165, shW: 0.2, hipW: 0.09, ua: 0.3, fa: 0.28, th: 0.45, sh: 0.44, foot: 0.14, torsoR: 0.165, armR: 0.052, legR: 0.075 };
   const mkArm = () => ({ p: 0.04, r: 0.1, e: 0.25, ik: null });
   const mkLeg = () => ({ p: 0, r: 0.03, k: 0.04 });
-  const newPose = () => ({ yaw: 0, rootY: 0, rootZ: 0, air: 0, bp: 0, br: 0, lean: 0, twist: 0, roll: 0, hp: 0, hy: 0, hr: 0, L: mkArm(), R: mkArm(), LL: mkLeg(), RL: mkLeg(), mouth: 0, eyes: 'open', brow: 0, smile: 0.4, ball: null });
+  const newPose = () => ({ yaw: 0, rootY: 0, rootZ: 0, air: 0, bp: 0, br: 0, lean: 0, twist: 0, roll: 0, hp: 0, hy: 0, hr: 0, L: mkArm(), R: mkArm(), LL: mkLeg(), RL: mkLeg(), mouth: 0, eyes: 'open', brow: 0, smile: 0.4, ball: null, sc: 1, flash: 0, hidden: false, prop: null });
   const setArm = (a, p, r, e, k = 1) => { a.p = mix(a.p, p, k); a.r = mix(a.r, r, k); a.e = mix(a.e, e, k); };
   const setLeg = (l, p, r, kn, k = 1) => { l.p = mix(l.p, p, k); l.r = mix(l.r, r, k); l.k = mix(l.k, kn, k); };
   const dirPR = (p, r, o) => { const wy = -cos(p), wz = sin(p); return [o * -wy * sin(r), wy * cos(r), wz]; };
@@ -50,6 +50,7 @@ const Anim = (() => {
     J.eyeL = hd([0.062, hc + 0.025, B.headR * 0.9]); J.eyeR = hd([-0.062, hc + 0.025, B.headR * 0.9]); J.mouth = hd([0, hc - 0.075, B.headR * 0.93]);
     J.fwd = nrm(sub(hd([0, hc, 1]), hd([0, hc, 0]))); J.up = nrm(sub(hd([0, hc + 1, 0]), hd([0, hc, 0]))); J.rgt = nrm(sub(hd([-1, hc, 0]), hd([0, hc, 0])));
     J.hairBack = hd([0, hc + 0.02, -B.headR * 0.55]); J.top = hd([0, hc + B.headR * 0.95, 0]);
+    J.sideR = nrm(sub(tor([-1, B.spine, 0]), tor([0, B.spine, 0])));
     for (const o of [1, -1]) {
       const A = o > 0 ? P.L : P.R, S = [o * B.shW, B.spine - 0.05, 0], key = o > 0 ? 'L' : 'R';
       let E = add(S, mul(dirPR(A.p, A.r, o), B.ua)), Wr = add(E, mul(dirPR(A.p + A.e, A.r * 0.85, o), B.fa));
@@ -197,6 +198,38 @@ const Anim = (() => {
     for (const a of [P.L, P.R]) { a.ik = { t: add(c.tgt, [0, -0.3, 0]), w: 0.9 * k }; setArm(a, 1.1, 0.5, 1.2, k); }
     P.hy = 0.2 * k; P.eyes = k > 0.5 ? 'closed' : 'open'; P.smile = 1; lookT(P, c, 0.4);
   });
+  /* --- klockowe czynności i rekwizyty --- */
+  act('mine', 'Kopie kilofem', { dur: 2.6 }, (P, u, s, c) => {
+    idle(P, c.t); const N = near(P, c), ph = 0.5 + 0.5 * sin(c.tt * 7), k = ss(u, 0, 0.1) * (1 - ss(u, 0.92, 1));
+    setArm(N, mix(-0.3, 2.3, ph), 0.25, mix(0.9, 0.4, ph), k); setArm(far(P, c), 0.6, 0.3, 1.0, k * 0.6); P.lean = (0.1 + 0.3 * (1 - ph)) * k; P.rootY = -0.03 * k; P.prop = { type: 'pickaxe', arm: c.near }; P.brow = 0.3 * k;
+  }, (s) => [{ k: 'chips', t: s.s0 + 0.2, d: s.s1 - s.s0 - 0.2, who: s.me }]);
+  act('build', 'Buduje z klocków', { dur: 1.7 }, (P, u, s, c) => {
+    idle(P, c.t); const k = pulse(ss(u, 0.05, 0.95)); setArm(near(P, c), 0.9, 0.35, 0.9, k); setArm(far(P, c), 0.7, 0.35, 0.9, k * 0.7); P.lean = 0.25 * k; P.hp = 0.2 * k; P.smile = 0.8;
+    if (u < 0.55) P.prop = { type: 'block', arm: c.near };
+  }, (s, C) => { const n = C.chars[s.me].segs.filter((q) => q.act === 'build' && q.s0 < s.s0 - 1e-6).length; return [{ k: 'cube', t: s.s0 + 0.9 * (s.s1 - s.s0), d: 999, who: s.me, at: [s.to[0] + sin(s.h1) * 0.85, n * 0.5, s.to[1] + cos(s.h1) * 0.85] }]; });
+  act('sword', 'Atakuje mieczem', { dur: 1.35, tgt: true, hitAt: 0.45, react: 'punched', reactDur: 2.0, gap: 1.15 }, (P, u, s, c) => {
+    idle(P, c.t); const N = near(P, c), d = c.near === 'R' ? 1 : -1, w = ss(u, 0.05, 0.35), k = ss(u, 0.35, 0.47), r = ss(u, 0.62, 0.95);
+    setArm(N, 2.6, 0.5, 0.6, w); setArm(N, 0.8, 0.3, 0.1, k); setArm(N, 0.05, 0.12, 0.25, r); setArm(far(P, c), 0.4, 0.5, 1.0, w * (1 - r));
+    P.twist = d * (-0.6 * w + 1.0 * k) * (1 - r); P.lean = (-0.2 * w + 0.45 * k) * (1 - r); P.rootZ = 0.15 * k * (1 - r); P.brow = 0.8 * w * (1 - r); P.prop = { type: 'sword', arm: c.near }; lookT(P, c);
+  }, (s) => [{ k: 'burst', t: s.hit, d: 0.8, who: s.tgtI, text: 'ŁUP!', j: 'head' }, { k: 'shock', t: s.hit, d: 0.4, who: s.tgtI, j: 'head' }, { k: 'stars', t: s.hit + 0.1, d: 1.4, who: s.tgtI }]);
+  act('explode', 'Wybucha', { dur: 1.9, hold: true, hitAt: 0.62 }, (P, u, s, c) => {
+    idle(P, c.t); const sw = ss(u, 0, 0.6), fl = 0.5 + 0.5 * sin(c.tt * 28);
+    P.sc = 1 + 0.35 * sw; P.flash = u < 0.62 ? sw * fl : 0; P.mouth = 0.6 * sw; P.brow = 0.8 * sw; P.hy = 0.1 * sin(c.tt * 40) * sw; P.roll = 0.05 * sin(c.tt * 35) * sw; setArm(P.L, 0.3 * sw, 0.5, 0.4); setArm(P.R, 0.3 * sw, 0.5, 0.4);
+    if (u >= 0.62) P.hidden = true;
+  }, (s) => [{ k: 'blast', t: s.hit, d: 1.3, who: s.me }, { k: 'burst', t: s.hit, d: 0.9, who: s.me, text: 'BUM!', j: 'chest' }]);
+  /* własny ruch wymyślony przez AI: klatki kluczowe (kąty w radianach) */
+  const KEYDEF = { lean: 0, twist: 0, roll: 0, hp: 0, hy: 0, hr: 0, rootY: 0, rootZ: 0, air: 0, bp: 0, yaw: 0, mouth: 0, smile: 0.4, brow: 0 }, KARM = [0.04, 0.1, 0.25], KLEG = [0, 0.03, 0.04];
+  function applyKeys(P, ks, u) {
+    if (!ks || !ks.length) return;
+    let a = ks[0], b = ks[0];
+    if (u >= ks[ks.length - 1].t) { a = b = ks[ks.length - 1]; } else if (u > ks[0].t) for (let i = 0; i < ks.length - 1; i++) if (u >= ks[i].t && u <= ks[i + 1].t) { a = ks[i]; b = ks[i + 1]; break; }
+    const k = a === b ? 0 : sm((u - a.t) / MX(1e-3, b.t - a.t));
+    for (const f in KEYDEF) P[f] = mix(a[f] == null ? KEYDEF[f] : a[f], b[f] == null ? KEYDEF[f] : b[f], k);
+    for (const f of ['L', 'R']) { const av = a[f] || KARM, bv = b[f] || KARM; P[f].p = mix(av[0], bv[0], k); P[f].r = mix(av[1], bv[1], k); P[f].e = mix(av[2], bv[2], k); }
+    for (const f of ['LL', 'RL']) { const av = a[f] || KLEG, bv = b[f] || KLEG; P[f].p = mix(av[0], bv[0], k); P[f].r = mix(av[1], bv[1], k); P[f].k = mix(av[2], bv[2], k); }
+    P.eyes = a.eyes || 'open';
+  }
+  act('custom', 'Własny ruch (AI)', { dur: 2 }, (P, u, s, c) => { idle(P, c.t); applyKeys(P, s.keys, u); });
   const ACT_LIST = Object.keys(ACTS);
   const HIT_ACTS = ACT_LIST.filter((k) => ACTS[k].react);
 
@@ -208,7 +241,7 @@ const Anim = (() => {
   function startPos(n, i) { const sp = n === 1 ? [0] : n === 2 ? [-2.3, 2.3] : n === 3 ? [-3, 0, 3] : [-4.2, -1.4, 1.4, 4.2]; const x = sp[i], z = n === 3 && i === 1 ? -0.9 : 0; return { x, z, face: n === 1 ? 1 : (x < 0 ? 1 : -1) }; }
   function newScene(o = {}) {
     const n = cl(o.n || 1, 1, 4), chars = [];
-    for (let i = 0; i < n; i++) { const sp = startPos(n, i), L = (o.looks && o.looks[i]) || LOOKS[i % LOOKS.length]; chars.push(Object.assign({ id: 'ABCD'[i], name: 'Postać ' + (i + 1), type: 'human', x: sp.x, z: sp.z, face: sp.face }, L)); }
+    for (let i = 0; i < n; i++) { const sp = startPos(n, i), L = (o.looks && o.looks[i]) || LOOKS[i % LOOKS.length]; chars.push(Object.assign({ id: 'ABCD'[i], name: 'Postać ' + (i + 1), type: 'human', model: 'round', x: sp.x, z: sp.z, face: sp.face }, L)); }
     return Object.assign({ v: 1, style: '3d', bg: 'park', cam: 'auto', prompt: '', chars, steps: [] }, o.over || {});
   }
   const speedOf = (mv) => (mv === 'run' ? 3.6 : 1.45);
@@ -250,13 +283,17 @@ const Anim = (() => {
       } else if (a.knock && tp) {
         const dx = from.x - tp.x, dz = from.z - tp.z, d = Math.hypot(dx, dz) || 1; to = [from.x + dx / d * a.knock, from.z + dz / d * a.knock]; h1 = Math.atan2(-dx, -dz);
       }
-      const seg = { s0, s1: s0 + dur, act: st.act, from: [from.x, from.z], to, h0: from.h, h1, tgt: st.tI, tgtI: st.tI, me: i, text: st.text || '', len: Math.hypot(to[0] - from.x, to[1] - from.z), hit: s0 + a.hitAt * dur, auto: !!st.auto };
+      const seg = { s0, s1: s0 + dur, act: st.act, from: [from.x, from.z], to, h0: from.h, h1, tgt: st.tI, tgtI: st.tI, me: i, text: st.text || '', len: Math.hypot(to[0] - from.x, to[1] - from.z), hit: s0 + a.hitAt * dur, auto: !!st.auto, keys: st.keys, name: st.name };
       ch.segs.push(seg); C.end = MX(C.end, seg.s1);
       if (a.react && !st.auto) {
         C.hits.push({ t: seg.hit, by: i, to: st.tI });
         if (st.tI >= 0 && st.tI !== i && !base.some((o) => o.me === st.tI && !o.auto && abs((o.at || 0) - seg.hit) < 0.6 && o !== st)) queue.push({ at: seg.hit, who: ids[st.tI], me: st.tI, act: a.react, target: st.who, tI: i, dur: a.reactDur, auto: true });
       }
-      if (a.fx) a.fx(seg).forEach((e) => C.fx.push(e));
+      if (st.act === 'explode') {
+        C.hits.push({ t: seg.hit, by: i, to: -1 });
+        sc.chars.forEach((_, j) => { if (j === i) return; const pj = posAt(j, seg.hit); if (Math.hypot(pj.x - from.x, pj.z - from.z) < 3.3 && !base.some((o) => o.me === j && !o.auto && abs((o.at || 0) - seg.hit) < 0.6)) queue.push({ at: seg.hit, who: ids[j], me: j, act: 'punched', target: st.who, tI: i, dur: 2.0, auto: true }); });
+      }
+      if (a.fx) a.fx(seg, C).forEach((e) => C.fx.push(e));
     }
     C.posAt = posAt; C.n = n; return C;
   }
@@ -292,13 +329,13 @@ const Anim = (() => {
     const cx = (minX + maxX) / 2; cz = nz ? cz / nz : 0;
     let focus = 0, shake = 0; if (sc.cam === 'close') focus = 0.75; else if (sc.cam !== 'wide') C.hits.forEach((h) => { focus = MX(focus, Math.exp(-(((t - h.t) / 0.55) ** 2))); shake = MX(shake, Math.exp(-(((t - h.t) / 0.09) ** 2))); });
     if (sc.cam === 'wide') shake = 0;
-    const span = MX(3.6, (maxX - minX) + 2.6) * (sc.cam === 'wide' ? 1.25 : 1), z = 1 + 0.65 * focus, sk = shake * 0.02 * H;
+    const span = MX(3.6, (maxX - minX) + 2.6) * (sc.cam === 'wide' ? 1.25 : 1), z = 1 + 0.5 * focus, sk = shake * 0.02 * H;
     const shx = sin(t * 83) * sk, shy = cos(t * 71) * sk;
     if (!three) {
-      const scale = MN(W / span, H / 2.5) * (1 + 0.38 * focus), gy = H * 0.8 + H * 0.42 * focus;
+      const scale = MN(W / span, H / 2.5) * (1 + 0.38 * focus), gy = H * 0.8 + H * 0.3 * focus;
       return { three: false, scale, hz: gy - H * 0.2 * (1 - 0.5 * focus), pan: cx * scale, project: (q) => [W / 2 + (q[0] - cx) * scale + shx, gy - q[1] * scale - q[2] * scale * 0.08 + shy, -q[2]], rad: (q, r) => r * scale, cx, gy, sc: scale, camDir: [0, 0, 1], pos: [cx, 1, 20] };
     }
-    const yaw = 0.06 + 0.3 * sin(t * 0.4) - 0.12 * focus, pitch = 0.16 + 0.03 * focus, dist = (MX(4.4, span * 0.7 + 1.6)) / z, tg = [cx, 0.9 + 0.35 * focus, cz];
+    const yaw = 0.06 + 0.3 * sin(t * 0.4) - 0.12 * focus, pitch = 0.16 + 0.03 * focus, dist = (MX(4.4, span * 0.7 + 1.6)) / z, tg = [cx, 0.95 + 0.6 * focus, cz];
     const Cp = [tg[0] + dist * sin(yaw) * cos(pitch), tg[1] + dist * sin(pitch), tg[2] + dist * cos(yaw) * cos(pitch)];
     const F = nrm(sub(tg, Cp)), Rv = nrm(cross(F, [0, 1, 0])), Uv = cross(Rv, F), f = (H / 2) / Math.tan(0.34);
     const project = (q) => { const v = sub(q, Cp), zc = MX(0.05, dot(v, F)), s = f / zc; return [W / 2 + dot(v, Rv) * s + shx, H / 2 - dot(v, Uv) * s + shy, zc]; };
@@ -349,20 +386,67 @@ const Anim = (() => {
       rep(W, sc * 2.4, pan * 0.5, (px, i) => { const th = sc * (1.4 + hash(i) * 0.9); x.fillStyle = '#2a6b4b'; for (let k = 0; k < 3; k++) { x.beginPath(); x.moveTo(px, hz - th + k * th * 0.28 - th * 0.02); x.lineTo(px - sc * (0.35 + k * 0.17), hz - th * 0.55 + k * th * 0.28); x.lineTo(px + sc * (0.35 + k * 0.17), hz - th * 0.55 + k * th * 0.28); x.closePath(); x.fill(); } });
       x.fillStyle = 'rgba(255,255,255,.9)'; for (let i = 0; i < 70; i++) { x.beginPath(); x.arc((hash(i) * W + sin(t + i) * 12 - pan * 0.1) % W, ((hash(i + 30) * H + t * (40 + hash(i + 9) * 50)) % H), 1.5 + hash(i + 4) * 2, 0, 7); x.fill(); } } },
   };
+  const sq = (x, px, py, w, h, c) => { x.fillStyle = c; x.fillRect(Math.round(px), Math.round(py), Math.ceil(w), Math.ceil(h)); };
+  const stepHills = (x, W, hz, sc, pan, par, base, amp, colA, colB, ph) => { const cw = sc * 0.4; for (let px = -cw; px < W + cw; px += cw) { const wx = px + pan * par, hh = Math.floor((sin(wx * 0.004 + ph) * 0.5 + 0.5 + sin(wx * 0.011 + ph * 2) * 0.25) * amp / (sc * 0.25)) * sc * 0.25 + base; sq(x, px, hz - hh, cw + 1, hh + 2, colA); sq(x, px, hz - hh, cw + 1, sc * 0.12, colB); } };
+  const cubeTree = (x, px, hz, sc, h, c1, c2, trunk) => { sq(x, px - sc * 0.1, hz - h, sc * 0.2, h, trunk); for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) if (!(r === 2 && c !== 1)) sq(x, px - sc * 0.45 + c * sc * 0.3, hz - h - sc * 0.3 * (r + 1) + sc * 0.1, sc * 0.3, sc * 0.3, (r + c) % 2 ? c1 : c2); };
+  BGS.voxel = { n: 'Świat z klocków', sky: ['#6fb4ff', '#d3ebff'], gnd: ['#5fae3a', '#3f7d28'], line: 'rgba(0,0,0,.22)', draw(x, W, H, hz, sc, pan, t) {
+    sq(x, W * 0.74 - pan * 0.02, hz - H * 0.5, sc * 0.9, sc * 0.9, '#fff7b0'); sq(x, W * 0.74 - pan * 0.02 + sc * 0.12, hz - H * 0.5 + sc * 0.12, sc * 0.66, sc * 0.66, '#ffe45e');
+    rep(W, sc * 6, pan * 0.15 + t * 5, (px, i) => { const y = hz - H * (0.34 + hash(i) * 0.12); for (let k = 0; k < 5; k++) sq(x, px + k * sc * 0.5, y + (k % 2) * sc * 0.25, sc * 0.5, sc * 0.25 + (k % 2 ? 0 : sc * 0.2), 'rgba(255,255,255,.92)'); });
+    stepHills(x, W, hz, sc, pan, 0.15, sc * 0.05, H * 0.1, '#7ac74f', '#8fe063', 1); stepHills(x, W, hz, sc, pan, 0.3, 0, H * 0.07, '#5aa83a', '#6fc047', 4);
+    rep(W, sc * 3.4, pan * 0.55, (px, i) => cubeTree(x, px, hz + 2, sc, sc * (0.9 + hash(i) * 0.7), '#2f8f3a', '#3aa046', '#7b5230')); } };
+  BGS.voxelnight = { n: 'Noc z klocków', sky: ['#050a1c', '#1c2a5e'], gnd: ['#2d5a2a', '#173317'], line: 'rgba(0,0,0,.3)', draw(x, W, H, hz, sc, pan, t) {
+    for (let i = 0; i < 70; i++) sq(x, hash(i) * W, hash(i + 40) * hz * 0.8, 3, 3, `rgba(255,255,255,${0.4 + 0.5 * sin(t * 2 + i)})`);
+    sq(x, W * 0.78 - pan * 0.02, hz - H * 0.5, sc * 0.7, sc * 0.7, '#e8eefc'); sq(x, W * 0.78 - pan * 0.02 + sc * 0.16, hz - H * 0.5 + sc * 0.2, sc * 0.18, sc * 0.18, '#c4cde6');
+    stepHills(x, W, hz, sc, pan, 0.15, sc * 0.05, H * 0.1, '#1f3d2a', '#2a5036', 2);
+    rep(W, sc * 3.4, pan * 0.55, (px, i) => cubeTree(x, px, hz + 2, sc, sc * (0.9 + hash(i) * 0.7), '#16341c', '#1d4224', '#2b1d12')); } };
+  BGS.voxelcave = { n: 'Jaskinia z klocków', sky: ['#17151b', '#2c2933'], gnd: ['#55555e', '#3a3a42'], line: 'rgba(0,0,0,.3)', draw(x, W, H, hz, sc, pan, t) {
+    const cw = sc * 0.5; for (let py = 0; py < hz; py += cw) for (let px = 0; px < W + cw; px += cw) { const wx = Math.floor((px + pan * 0.3) / cw), n2 = hash(wx * 7.3 + py * 0.11); sq(x, px - ((pan * 0.3) % cw), py, cw + 1, cw + 1, `rgb(${46 + n2 * 28},${44 + n2 * 26},${52 + n2 * 28})`); if (n2 > 0.93) sq(x, px - ((pan * 0.3) % cw) + cw * 0.25, py + cw * 0.25, cw * 0.5, cw * 0.5, n2 > 0.97 ? '#5ee0ff' : '#f2c94c'); }
+    rep(W, sc * 4, pan * 0.5, (px, i) => { const y = hz - sc * 1.6; sq(x, px - sc * 0.06, y, sc * 0.12, sc * 0.4, '#7b5230'); sq(x, px - sc * 0.09, y - sc * 0.14, sc * 0.18, sc * 0.16, `rgb(255,${160 + 50 * sin(t * 9 + i)},40)`); const g = x.createRadialGradient(px, y, 2, px, y, sc * 1.6); g.addColorStop(0, 'rgba(255,170,60,.38)'); g.addColorStop(1, 'rgba(255,170,60,0)'); x.fillStyle = g; x.fillRect(px - sc * 1.6, y - sc * 1.6, sc * 3.2, sc * 3.2); }); } };
+  BGS.voxellava = { n: 'Świat lawy', sky: ['#260707', '#8a2208'], gnd: ['#3a1818', '#220c0c'], line: 'rgba(255,120,40,.25)', draw(x, W, H, hz, sc, pan, t) {
+    stepHills(x, W, hz, sc, pan, 0.15, sc * 0.2, H * 0.12, '#3d1210', '#4f1a14', 3);
+    for (let px = 0; px < W; px += sc * 0.3) { const f = hash(Math.floor((px + pan * 0.4) / (sc * 0.3)) + Math.floor(t * 3)); sq(x, px, hz - sc * 0.22, sc * 0.3 + 1, sc * 0.22, f > 0.6 ? '#ffd23a' : f > 0.25 ? '#ff8a1e' : '#e2420f'); }
+    rep(W, sc * 5, pan * 0.4, (px, i) => { const y = hz - sc * 0.25; for (let k = 0; k < 4; k++) sq(x, px, y - k * sc * 0.28, sc * 0.28, sc * 0.28, k % 2 ? '#1b0d0d' : '#2b1414'); }); } };
   const BG_LIST = Object.keys(BGS);
 
   /* ---------- rysowanie postaci ---------- */
   function buildParts(J, look, P) {
-    const r = B, c = look, rob = c.hs === 'robot', skin = c.skin, sh = c.shirt, pa = c.pants, shoe = rob ? '#1e293b' : '#1f1f2b', parts = [];
-    const cap = (a, b, rad, col, tag) => parts.push({ t: 'c', a: a.slice(), b: b.slice(), r: rad, col, tag });
-    const sph = (a, rad, col, tag) => parts.push({ t: 's', a: a.slice(), b: a.slice(), r: rad, col, tag });
-    for (const k of ['L', 'R']) {
-      cap(J['hp' + k], J['kn' + k], r.legR + 0.01, pa); cap(J['kn' + k], J['an' + k], r.legR, pa); cap(J['an' + k], J['to' + k], 0.065, shoe);
-      cap(J['sh' + k], J['el' + k], r.armR + 0.006, sh); cap(J['el' + k], J['wr' + k], r.armR - 0.004, rob ? '#8fa0b3' : skin); sph(J['wr' + k], 0.058, rob ? '#8fa0b3' : skin);
+    if (P.hidden) return [];
+    const r = B, c = look, rob = c.hs === 'robot', blk = c.model === 'block', F = P.flash || 0, S = P.sc || 1, parts = [];
+    const fc = (col) => (F > 0.01 ? mixc(col, '#ffffff', F) : col);
+    const skin = fc(c.skin), sh = fc(c.shirt), pa = fc(c.pants), shoe = fc(rob ? '#1e293b' : '#1f1f2b'), hand = rob ? fc('#8fa0b3') : skin;
+    const cap = (a, b, rad, col, tag) => parts.push({ t: 'c', a: a.slice(), b: b.slice(), r: rad * S, col, tag });
+    const sph = (a, rad, col, tag) => parts.push({ t: 's', a: a.slice(), b: a.slice(), r: rad * S, col, tag });
+    const box = (a, b, w, d, col, tag, side) => parts.push({ t: 'b', a: a.slice(), b: b.slice(), w: w * S, d: d * S, r: MX(w, d) * S, col, tag, side });
+    if (blk) {
+      const sd = J.sideR, ext = (a, b, k) => add(b, mul(nrm(sub(b, a)), k));
+      for (const k of ['L', 'R']) {
+        box(J['hp' + k], J['kn' + k], 0.088, 0.088, pa, 'leg', sd); box(J['kn' + k], J['an' + k], 0.082, 0.082, pa, 'leg', sd); box(J['an' + k], J['to' + k], 0.075, 0.055, shoe, 'foot', sd);
+        box(J['sh' + k], J['el' + k], 0.07, 0.07, sh, 'arm', sd); box(J['el' + k], J['wr' + k], 0.066, 0.066, skin, 'arm', sd); box(J['wr' + k], ext(J['el' + k], J['wr' + k], 0.08), 0.065, 0.065, hand, 'hand', sd);
+      }
+      box(J.pel, J.chest, 0.2, 0.115, sh, 'torso', sd); box(J.pel, mix3(J.pel, J.chest, 0.3), 0.205, 0.12, pa, 'hips', sd);
+      const hr = r.headR * 1.02, hc = J.head, up = J.up, fw = J.fwd, rg = J.rgt;
+      box(sub(hc, mul(up, hr)), add(hc, mul(up, hr)), hr, hr, skin, 'head', rg);
+      const hair = fc(c.hair);
+      if (c.hs === 'short' || c.hs === 'long' || c.hs === 'bun') { box(add(hc, mul(up, hr * 0.6)), add(hc, mul(up, hr * 1.1)), hr * 1.07, hr * 1.07, hair, 'hair', rg); box(sub(add(hc, mul(up, hr * 0.5)), mul(fw, hr * 0.82)), sub(add(hc, mul(up, hr * 0.6 - (c.hs === 'long' ? 1.7 * hr : 0.6 * hr))), mul(fw, hr * 0.82)), hr * 1.05, hr * 0.3, hair, 'hair', rg); }
+      if (c.hs === 'bun') box(add(hc, mul(up, hr * 1.1)), add(hc, mul(up, hr * 1.6)), hr * 0.4, hr * 0.4, hair, 'hair', rg);
+      if (c.hs === 'cap') { const cc = fc('#e53935'); box(add(hc, mul(up, hr * 0.55)), add(hc, mul(up, hr * 1.1)), hr * 1.08, hr * 1.08, cc, 'hair', rg); box(add(add(hc, mul(up, hr * 0.55)), mul(fw, hr * 0.95)), add(add(hc, mul(up, hr * 0.7)), mul(fw, hr * 1.9)), hr * 0.95, hr * 0.12, fc('#b71c1c'), 'hair', rg); }
+      if (rob) { box(add(hc, mul(up, hr)), add(hc, mul(up, hr * 1.9)), hr * 0.08, hr * 0.08, '#94a3b8', 'hair', rg); box(add(hc, mul(up, hr * 1.9)), add(hc, mul(up, hr * 2.2)), hr * 0.16, hr * 0.16, '#ef4444', 'hair', rg); }
+    } else {
+      for (const k of ['L', 'R']) {
+        cap(J['hp' + k], J['kn' + k], r.legR + 0.01, pa); cap(J['kn' + k], J['an' + k], r.legR, pa); cap(J['an' + k], J['to' + k], 0.065, shoe);
+        cap(J['sh' + k], J['el' + k], r.armR + 0.006, sh); cap(J['el' + k], J['wr' + k], r.armR - 0.004, rob ? fc('#8fa0b3') : skin); sph(J['wr' + k], 0.058, hand);
+      }
+      cap(J.pel, J.chest, r.torsoR, sh, 'torso'); cap(J.pel, mix3(J.pel, J.chest, 0.35), r.torsoR - 0.015, pa); sph(J.pel, 0.115, pa);
+      cap(J.chest, J.neck, 0.05, skin); sph(J.head, r.headR, skin, 'head');
+      if (c.hs === 'long') cap(J.hairBack, mix3(J.hairBack, J.neck, 0.9), 0.1, fc(c.hair), 'hairback');
     }
-    cap(J.pel, J.chest, r.torsoR, sh, 'torso'); cap(J.pel, mix3(J.pel, J.chest, 0.35), r.torsoR - 0.015, pa); sph(J.pel, 0.115, pa);
-    cap(J.chest, J.neck, 0.05, skin); sph(J.head, r.headR, skin, 'head');
-    if (c.hs === 'long') cap(J.hairBack, mix3(J.hairBack, J.neck, 0.9), 0.1, c.hair, 'hairback');
+    /* rekwizyty w ręku */
+    if (P.prop) {
+      const k = P.prop.arm === 'L' ? 'L' : 'R', wr = J['wr' + k], el = J['el' + k], d = nrm(sub(wr, el)), sd = J.sideR, ty = P.prop.type;
+      if (ty === 'pickaxe') { const e = add(wr, mul(d, 0.5)); box(sub(wr, mul(d, 0.12)), e, 0.028, 0.028, '#8b5a2b', 'prop', sd); box(sub(e, mul(sd, 0.28)), add(e, mul(sd, 0.28)), 0.04, 0.04, '#9aa4b2', 'prop', d); }
+      else if (ty === 'sword') { const e = add(wr, mul(d, 0.85)); box(sub(wr, mul(d, 0.1)), add(wr, mul(d, 0.04)), 0.03, 0.03, '#8b5a2b', 'prop', sd); box(sub(add(wr, mul(d, 0.05)), mul(sd, 0.12)), add(add(wr, mul(d, 0.05)), mul(sd, 0.12)), 0.03, 0.03, '#d4af37', 'prop', d); box(add(wr, mul(d, 0.06)), e, 0.035, 0.012, '#dbe4ee', 'prop', sd); }
+      else if (ty === 'block') box(add(wr, mul(d, 0.02)), add(wr, mul(d, 0.26)), 0.13, 0.13, '#9a6a3a', 'prop', sd);
+    }
     return parts;
   }
   const mix3 = (a, b, k) => lerp3(a, b, k);
@@ -379,7 +463,29 @@ const Anim = (() => {
     }
   }
   const OUT = '#14121c';
-  function paintPart(x, cam, p, flat, W) {
+  const LIGHT = nrm([-0.45, 0.85, 0.55]);
+  function paintBox(x, cam, p, flat, it) {
+    let u = sub(p.b, p.a); const L = len(u); u = L < 1e-5 ? [0, 1, 0] : mul(u, 1 / L);
+    let sd = p.side || it.J.sideR; sd = sub(sd, mul(u, dot(sd, u))); sd = len(sd) < 1e-4 ? cross(u, [0, 0, 1]) : nrm(sd); const td = nrm(cross(u, sd));
+    const sx = mul(sd, p.w), ty = mul(td, p.d), C = [];
+    for (const e of [p.a, p.b]) for (const a of [-1, 1]) for (const b of [-1, 1]) C.push(add(e, add(mul(sx, a), mul(ty, b))));
+    /* indeksy: [e][a][b] => e*4 + (a>0)*2 + (b>0) */
+    const I = (e, a, b) => e * 4 + (a > 0 ? 2 : 0) + (b > 0 ? 1 : 0), cen = lerp3(p.a, p.b, 0.5);
+    const faces = [[[I(0, -1, -1), I(0, 1, -1), I(0, 1, 1), I(0, -1, 1)], mul(u, -1)], [[I(1, -1, -1), I(1, -1, 1), I(1, 1, 1), I(1, 1, -1)], u],
+      [[I(0, -1, -1), I(1, -1, -1), I(1, 1, -1), I(0, 1, -1)], mul(td, -1)], [[I(0, -1, 1), I(0, 1, 1), I(1, 1, 1), I(1, -1, 1)], td],
+      [[I(0, -1, -1), I(0, -1, 1), I(1, -1, 1), I(1, -1, -1)], mul(sd, -1)], [[I(0, 1, -1), I(1, 1, -1), I(1, 1, 1), I(0, 1, 1)], sd]];
+    const camPos = cam.three ? cam.pos : add(cen, [0, 0.4, 20]), pr = C.map((q) => cam.project(q)), rr = cam.rad(cen, 1), ow = MX(1.2, rr * 0.012);
+    const vis = faces.map(([idx, n]) => { const c0 = lerp3(C[idx[0]], C[idx[2]], 0.5); return [idx, n, dot(n, sub(camPos, c0)), dot(n, LIGHT)]; }).filter((f) => f[2] > 0).sort((a, b) => b[2] - a[2]);
+    x.lineJoin = 'round';
+    vis.forEach(([idx, n, , lt]) => {
+      const f = flat ? 0.78 + 0.22 * MX(0, lt) : 0.5 + 0.5 * MX(0, lt);
+      x.fillStyle = mixc(p.col, '#000000', 1 - MN(1, f)); x.strokeStyle = OUT; x.lineWidth = ow * 2;
+      x.beginPath(); idx.forEach((k, i) => (i ? x.lineTo(pr[k][0], pr[k][1]) : x.moveTo(pr[k][0], pr[k][1]))); x.closePath(); x.fill(); x.stroke();
+      if (!flat && lt > 0.5) { x.strokeStyle = 'rgba(255,255,255,.16)'; x.lineWidth = ow; x.beginPath(); idx.forEach((k, i) => (i ? x.lineTo(pr[k][0], pr[k][1]) : x.moveTo(pr[k][0], pr[k][1]))); x.closePath(); x.stroke(); }
+    });
+  }
+  function paintPart(x, cam, p, flat, W, it) {
+    if (p.t === 'b') { paintBox(x, cam, p, flat, it); return; }
     const pa = cam.project(p.a), pb = cam.project(p.b), mid = lerp3(p.a, p.b, 0.5), pr = cam.rad(mid, p.r), ow = MX(1.2, pr * 0.16);
     const lit = flat ? p.col : p.col;
     x.lineCap = 'round'; x.lineJoin = 'round';
@@ -431,6 +537,24 @@ const Anim = (() => {
     x.restore();
   }
 
+  function drawBlockFace(x, cam, it) {
+    const { J, P, look } = it; if (P.hidden) return;
+    const hr = B.headR * 1.02, cdir = cam.three ? nrm(sub(cam.pos, J.head)) : [0, 0.1, 1], facing = dot(J.fwd, cdir); if (facing < 0.04) return;
+    const F = add(J.head, mul(J.fwd, hr * 1.005)), q = (c, a, b) => cam.project(add(c, add(mul(J.rgt, a), mul(J.up, b)))), rob = look.hs === 'robot';
+    const quad = (c, w, h, col) => { const p0 = q(c, -w, -h), p1 = q(c, w, -h), p2 = q(c, w, h), p3 = q(c, -w, h); x.fillStyle = col; x.beginPath(); x.moveTo(p0[0], p0[1]); x.lineTo(p1[0], p1[1]); x.lineTo(p2[0], p2[1]); x.lineTo(p3[0], p3[1]); x.closePath(); x.fill(); };
+    const ew = hr * 0.17;
+    for (const sg of [1, -1]) {
+      const ec = add(F, add(mul(J.rgt, sg * hr * 0.42), mul(J.up, hr * 0.12)));
+      if (P.eyes === 'closed') quad(add(ec, mul(J.up, -ew * 0.4)), ew, ew * 0.22, '#1b1020');
+      else if (P.eyes === 'happy') { quad(add(ec, mul(J.up, ew * 0.2)), ew, ew * 0.2, '#1b1020'); quad(add(ec, mul(J.up, ew * 0.7)), ew * 0.5, ew * 0.2, '#1b1020'); }
+      else if (P.eyes === 'x') { const a0 = q(ec, -ew, -ew), a1 = q(ec, ew, ew), b0 = q(ec, ew, -ew), b1 = q(ec, -ew, ew); x.strokeStyle = '#1b1020'; x.lineWidth = MX(1.5, cam.rad(F, hr) * 0.1); x.beginPath(); x.moveTo(a0[0], a0[1]); x.lineTo(a1[0], a1[1]); x.moveTo(b0[0], b0[1]); x.lineTo(b1[0], b1[1]); x.stroke(); }
+      else if (rob) quad(ec, ew * 1.1, ew * 0.8, '#7dd3fc');
+      else { quad(ec, ew * 1.15, ew * 1.15, '#ffffff'); quad(add(ec, add(mul(J.rgt, -sg * ew * 0.25), mul(J.up, -ew * 0.1))), ew * 0.62, ew * 0.7, '#3b2a8f'); }
+      if (P.brow > 0.15) quad(add(ec, mul(J.up, ew * 1.7)), ew * 1.3, ew * 0.22, '#1b1020');
+    }
+    const mc = add(F, mul(J.up, -hr * 0.42));
+    if (P.mouth > 0.18) quad(mc, hr * (0.22 + P.mouth * 0.12), hr * (0.07 + P.mouth * 0.17), '#3a0d16'); else { quad(mc, hr * 0.25, hr * 0.06, '#1b1020'); if (P.smile > 0.5) { quad(add(mc, add(mul(J.rgt, hr * 0.3), mul(J.up, hr * 0.07))), hr * 0.06, hr * 0.06, '#1b1020'); quad(add(mc, add(mul(J.rgt, -hr * 0.3), mul(J.up, hr * 0.07))), hr * 0.06, hr * 0.06, '#1b1020'); } else if (P.smile < -0.4) { quad(add(mc, add(mul(J.rgt, hr * 0.3), mul(J.up, -hr * 0.07))), hr * 0.06, hr * 0.06, '#1b1020'); quad(add(mc, add(mul(J.rgt, -hr * 0.3), mul(J.up, -hr * 0.07))), hr * 0.06, hr * 0.06, '#1b1020'); } }
+  }
   /* ---------- efekty ---------- */
   const FONT = '900 {S}px Bangers, Anton, Impact, "Arial Black", sans-serif';
   function star(x, cx, cy, ro, ri, n, rot) { x.beginPath(); for (let i = 0; i < n * 2; i++) { const r = i % 2 ? ri : ro, a = rot + i * PI / n; x.lineTo(cx + cos(a) * r, cy + sin(a) * r); } x.closePath(); }
@@ -467,6 +591,10 @@ const Anim = (() => {
         const a = items[ev.who], b = items[ev.to]; if (!a || !b) break; const p0 = a.J.wrR, p1 = add(b.J.head, [0, -0.15, 0]), q = lerp3(p0, p1, u); q[1] += sin(PI * u) * 0.5; const bp = cam.project(q), r = cam.rad(q, 0.11);
         x.fillStyle = '#fff'; x.strokeStyle = '#14121c'; x.lineWidth = 2; x.beginPath(); x.arc(bp[0], bp[1], r, 0, 7); x.fill(); x.stroke(); x.beginPath(); x.moveTo(bp[0] - r, bp[1]); x.lineTo(bp[0] + r, bp[1]); x.moveTo(bp[0], bp[1] - r); x.lineTo(bp[0], bp[1] + r); x.stroke(); break;
       }
+      case 'chips': { const o = it.J.pel, hh = it.h, ox = o[0] + sin(hh) * 0.9, oz = o[2] + cos(hh) * 0.9; for (let k = 0; k < 9; k++) { const v = (t * 1.4 + k / 9) % 1, q = [ox + (hash(k) - 0.5) * 0.7 * v, 0.1 + 0.9 * v - 1.9 * v * v + 0.2, oz + (hash(k + 5) - 0.5) * 0.3], pp = cam.project(q), rr = MX(2, cam.rad(q, 0.045)); x.globalAlpha = 1 - ss(v, 0.7, 1); x.fillStyle = ['#8b5a2b', '#6b7280', '#4e9a30'][k % 3]; x.fillRect(pp[0] - rr, pp[1] - rr, rr * 2, rr * 2); } break; }
+      case 'cube': { const pop = ss(t - ev.t, 0, 0.28), a = ev.at, w = 0.25 * (0.6 + 0.5 * pop - 0.1 * Math.cos(pop * PI) * (1 - pop)); x.globalAlpha = MN(1, pop * 3); paintBox(x, cam, { t: 'b', a: [a[0], a[1], a[2]], b: [a[0], a[1] + 0.5 * pop, a[2]], w, d: w, r: w, col: '#a9753f', side: [1, 0, 0] }, false, it); break; }
+      case 'blast': { const rr0 = cam.rad(it.J.pel, 1) * (0.3 + u * 2.6); x.globalAlpha = 1 - u; const g = x.createRadialGradient(hp[0], hp[1], rr0 * 0.1, hp[0], hp[1], rr0); g.addColorStop(0, '#fff6b0'); g.addColorStop(0.45, '#ffb020'); g.addColorStop(1, 'rgba(220,60,20,0)'); x.fillStyle = g; x.beginPath(); x.arc(hp[0], hp[1], rr0, 0, 7); x.fill();
+        for (let k = 0; k < 16; k++) { const a2 = hash(k) * 6.283, d2 = (0.4 + hash(k + 9) * 1.8) * u, q = [it.J.pel[0] + cos(a2) * d2, it.J.pel[1] + 0.2 + sin(a2 * 1.7) * d2 * 0.8 - 1.4 * u * u, it.J.pel[2] + sin(a2) * d2 * 0.6], pp = cam.project(q), s2 = MX(2, cam.rad(q, 0.07 * (1 - u * 0.5))); x.fillStyle = ['#22c55e', '#16a34a', '#e5e7eb', '#fbbf24'][k % 4]; x.fillRect(pp[0] - s2, pp[1] - s2, s2 * 2, s2 * 2); } break; }
       case 'chair': { const g = cam.project([it.J.pel[0], 0, it.J.pel[2]]), hh = cam.rad(it.J.pel, 0.5), w = cam.rad(it.J.pel, 0.3); x.fillStyle = '#9a6a3a'; x.strokeStyle = OUT; x.lineWidth = 2; const sy = g[1] - hh + cam.rad(it.J.pel, 0.04); x.fillRect(g[0] - w, sy, w * 2, hh * 0.12); x.strokeRect(g[0] - w, sy, w * 2, hh * 0.12); x.fillRect(g[0] - w * 0.9, sy, w * 0.14, hh); x.fillRect(g[0] + w * 0.76, sy, w * 0.14, hh); break; }
       default: break;
     }
@@ -492,25 +620,27 @@ const Anim = (() => {
     });
     groundShift(items);
     /* cienie */
-    items.forEach((it) => { const g = cam.project([it.J.pel[0], 0, it.J.pel[2]]), r = cam.rad([it.J.pel[0], 0, it.J.pel[2]], 0.45) * (1 - MN(0.5, it.P.air * 0.4)); x.fillStyle = 'rgba(0,0,0,' + (0.3 - MN(0.18, it.P.air * 0.2)).toFixed(3) + ')'; x.beginPath(); x.ellipse(g[0], g[1], r, r * (cam.three ? 0.32 : 0.22), 0, 0, 7); x.fill(); });
+    items.forEach((it) => { if (it.P.hidden) return; const g = cam.project([it.J.pel[0], 0, it.J.pel[2]]), r = cam.rad([it.J.pel[0], 0, it.J.pel[2]], 0.45) * (1 - MN(0.5, it.P.air * 0.4)); x.fillStyle = 'rgba(0,0,0,' + (0.3 - MN(0.18, it.P.air * 0.2)).toFixed(3) + ')'; x.beginPath(); x.ellipse(g[0], g[1], r, r * (cam.three ? 0.32 : 0.22), 0, 0, 7); x.fill(); });
     /* krzesła pod postaciami (wymagają pozycji) rysowane jako efekty „chair” przed częściami */
     C.fx.filter((e) => e.k === 'chair' && t >= e.t && items[e.who] && items[e.who].ev.seg && items[e.who].ev.seg.act === 'sit').forEach((e) => fxDraw(x, cam, e, 0, t, items, W, H));
     const all = []; items.forEach((it) => it.parts.forEach((p) => all.push({ it, p, d: cam.project(lerp3(p.a, p.b, 0.5))[2] + (p.tag === 'hairback' ? 0.05 : 0) + (p.tag === 'head' ? -0.02 : 0) })));
     all.sort((a, b) => b.d - a.d);
-    all.forEach(({ it, p }) => { paintPart(x, cam, p, it.flat, W); if (p.tag === 'head') drawHeadExtras(x, cam, it); });
+    all.forEach(({ it, p }) => { paintPart(x, cam, p, it.flat, W, it); if (p.tag === 'head') (it.look.model === 'block' ? drawBlockFace : drawHeadExtras)(x, cam, it); });
     items.forEach((it) => { if (it.P.ball) { const q = it.J[it.P.ball.hand], bp = cam.project(q), r = cam.rad(q, 0.11); x.fillStyle = '#fff'; x.strokeStyle = OUT; x.lineWidth = 2; x.beginPath(); x.arc(bp[0], bp[1] - r, r, 0, 7); x.fill(); x.stroke(); } });
     C.fx.forEach((e) => { if (e.k === 'chair') return; if (t >= e.t && t <= e.t + e.d) fxDraw(x, cam, e, cl((t - e.t) / MX(0.01, MN(e.d, 50)), 0, 1), t, items, W, H); });
     x.restore();
   }
 
+  const NUMK = { lean: 3.3, twist: 3.3, roll: 3.3, hp: 3.3, hy: 3.3, hr: 3.3, rootY: 0.8, rootZ: 0.8, air: 1.6, bp: 6.4, yaw: 6.4, mouth: 1, smile: 1, brow: 1 };
+  const sanKeys = (ks) => (Array.isArray(ks) ? ks.slice(0, 16).map((k) => { if (!k) return null; const o = { t: cl(+k.t || 0, 0, 1) }; for (const f in NUMK) if (k[f] != null && isFinite(+k[f])) o[f] = cl(+k[f], -NUMK[f], NUMK[f]); for (const f of ['L', 'R', 'LL', 'RL']) if (Array.isArray(k[f]) && k[f].length >= 3) o[f] = k[f].slice(0, 3).map((v) => cl(+v || 0, -3.3, 3.3)); if (['open', 'closed', 'happy', 'x'].includes(k.eyes)) o.eyes = k.eyes; return o; }).filter(Boolean).sort((a, b) => a.t - b.t) : undefined);
   function sanitize(o, fallbackN) {
     if (!o || typeof o !== 'object') return null;
     const n = cl(Array.isArray(o.chars) ? o.chars.length : (fallbackN || 1), 1, 4), sc = newScene({ n });
     sc.style = o.style === '2d' ? '2d' : '3d'; sc.bg = BGS[o.bg] ? o.bg : 'park'; sc.cam = ['auto', 'wide', 'close'].includes(o.cam) ? o.cam : 'auto'; sc.prompt = String(o.prompt || '').slice(0, 800);
-    if (Array.isArray(o.chars)) o.chars.slice(0, 4).forEach((c, i) => { if (!c) return; const d = sc.chars[i], col = (v, dv) => (/^#[0-9a-f]{6}$/i.test(v) ? v : dv); Object.assign(d, { name: String(c.name || d.name).slice(0, 24), type: c.type === 'robot' ? 'robot' : 'human', skin: col(c.skin, d.skin), shirt: col(c.shirt, d.shirt), pants: col(c.pants, d.pants), hair: col(c.hair, d.hair), hs: ['short', 'long', 'bun', 'cap', 'none'].includes(c.hs) ? c.hs : d.hs }); });
+    if (Array.isArray(o.chars)) o.chars.slice(0, 4).forEach((c, i) => { if (!c) return; const d = sc.chars[i], col = (v, dv) => (/^#[0-9a-f]{6}$/i.test(v) ? v : dv); Object.assign(d, { name: String(c.name || d.name).slice(0, 24), type: c.type === 'robot' ? 'robot' : 'human', skin: col(c.skin, d.skin), shirt: col(c.shirt, d.shirt), pants: col(c.pants, d.pants), hair: col(c.hair, d.hair), hs: ['short', 'long', 'bun', 'cap', 'none'].includes(c.hs) ? c.hs : d.hs, model: c.model === 'block' ? 'block' : 'round' }); });
     const ids = sc.chars.map((c) => c.id);
-    sc.steps = (Array.isArray(o.steps) ? o.steps : []).slice(0, 80).map((s) => ({ at: cl(+s.at || 0, 0, 120), dur: s.dur > 0 ? cl(+s.dur, 0.2, 15) : 0, who: ids.includes(s.who) ? s.who : ids[0], act: ACTS[s.act] ? s.act : 'idle', target: ids.includes(s.target) ? s.target : null, text: s.text ? String(s.text).slice(0, 60) : '', gap: s.gap > 0 ? cl(+s.gap, 0.3, 4) : 0 }));
+    sc.steps = (Array.isArray(o.steps) ? o.steps : []).slice(0, 80).map((s) => ({ at: cl(+s.at || 0, 0, 120), dur: s.dur > 0 ? cl(+s.dur, 0.2, 15) : 0, who: ids.includes(s.who) ? s.who : ids[0], act: ACTS[s.act] ? s.act : 'idle', target: ids.includes(s.target) ? s.target : null, text: s.text ? String(s.text).slice(0, 60) : '', gap: s.gap > 0 ? cl(+s.gap, 0.3, 4) : 0, name: s.n ? String(s.n).slice(0, 30) : undefined, keys: s.act === 'custom' ? sanKeys(s.keys) : undefined }));
     return sc;
   }
-  return { ACTS, ACT_LIST, HIT_ACTS, BGS, BG_LIST, LOOKS, ROBOT, newScene, compile: get, duration, draw, sanitize, startPos, speedOf, DEF };
+  return { ACTS, ACT_LIST, HIT_ACTS, BGS, BG_LIST, LOOKS, ROBOT, newScene, sanKeys, compile: get, duration, draw, sanitize, startPos, speedOf, DEF };
 })();
