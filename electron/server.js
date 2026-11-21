@@ -15,6 +15,6 @@ function start(port = 0, host = '127.0.0.1') {
       res.end(buf);
     });
   });
-  return new Promise((resolve) => server.listen(port, host, () => resolve({ server, port: server.address().port })));
+  return new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, () => resolve({ server, port: server.address().port })); });
 }
 module.exports = { start };

@@ -172,11 +172,27 @@ const AIProv = {
 Schema: {"style":"3d"|"2d","bg":${JSON.stringify(Anim.BG_LIST)},"cam":"auto"|"wide"|"close","chars":[{"id":"A","name":"...","type":"human"|"robot","skin":"#rrggbb","shirt":"#rrggbb","pants":"#rrggbb","hair":"#rrggbb","hs":"short"|"long"|"bun"|"cap"|"none","model":"round"|"block"}],"steps":[{"at":seconds,"dur":seconds,"who":"A","act":${JSON.stringify(Anim.ACT_LIST.filter((a) => !['slapped', 'punched', 'kicked', 'pushed', 'hit', 'hugged'].includes(a)))},"target":"B"|null,"text":"optional speech"}]}
 Rules: 1-4 characters with ids A,B,C,D; they start apart (two characters are ~4.6 m apart, facing each other). Walking speed is 1.45 m/s, running 3.6 m/s, so "approach" from the start positions takes about 3 seconds. Steps of different characters may overlap in time but one character's steps must not overlap. Acts that need a target (approach, slap, punch, kick, push, hug, kiss, throw, point, look, shout) must set "target". Reactions of the victim (stagger, fall) are added automatically — do NOT add them; after a hit the victim is busy for ~1.5 s. Total length 5-20 seconds. For block-world / voxel-game-style requests use "model":"block" and a voxel* background. If no listed act fits, invent a NEW move with act "custom", "n":"short name", "dur":seconds and "keys": 3-10 keyframes [{"t":0..1 fraction of the move,"lean":rad,"twist":rad,"roll":rad,"hp":rad,"hy":rad,"hr":rad,"rootY":m,"air":m,"bp":rad,"L":[pitch,roll,elbow],"R":[pitch,roll,elbow],"LL":[pitch,roll,knee],"RL":[pitch,roll,knee],"eyes":"open|closed|happy|x","mouth":0..1,"smile":-1..1,"brow":-1..1}]. Angles are radians: arm pitch forward is positive, arm roll outward is positive (2.5 = arm raised overhead), elbow flex positive, leg pitch forward positive, knee flex positive, lean forward positive, hp positive = nod, bp negative = falling backwards (-1.5 = lying on the back). Omitted fields default to a relaxed standing pose. Output valid JSON only.`;
   },
-  async fetchJson(url, opt, ms = 60000) {
+  /* w aplikacji desktopowej zapytania idą przez proces główny (bez blokad CORS); w przeglądarce zwykły fetch */
+  async net(url, opt = {}, ms = 60000) {
+    const nat = window.kadrNative;
+    if (nat && nat.fetch) {
+      const r = await nat.fetch(url, { method: opt.method, headers: opt.headers, body: opt.body, timeout: ms });
+      return new Response([101, 204, 205, 304].includes(r.status) ? null : r.body, { status: r.status, statusText: r.statusText, headers: r.headers });
+    }
     const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), ms);
-    try { const r = await fetch(url, Object.assign({ signal: ctl.signal }, opt)); if (!r.ok) { let b = ''; try { b = (await r.text()).slice(0, 160); } catch (e) { /* ok */ } throw new Error('HTTP ' + r.status + (b ? ' ' + b : '')); } return await r.json(); }
-    catch (e) { throw new Error(e.name === 'AbortError' ? 'przekroczono czas oczekiwania' : /Failed to fetch|NetworkError|Load failed/.test(e.message) ? 'brak połączenia lub blokada CORS (uruchom aplikację instalacyjną albo sprawdź adres)' : e.message); }
-    finally { clearTimeout(tm); }
+    try { return await fetch(url, Object.assign({}, opt, { signal: ctl.signal })); } finally { clearTimeout(tm); }
+  },
+  niceError(e) {
+    const m = String((e && e.message) || e), raw = m.replace(/^Error invoking remote method '[^']*': (Error: )?/, '');
+    if (e && e.name === 'AbortError' || /TIMEOUT/.test(raw)) return 'przekroczono czas oczekiwania';
+    if (/ECONNREFUSED/.test(raw)) return 'nikt nie odpowiada pod tym adresem (czy Ollama / serwer jest uruchomiony?)';
+    if (/ENOTFOUND|EAI_AGAIN/.test(raw)) return 'nie znaleziono serwera — sprawdź adres i internet';
+    if (/Failed to fetch|NetworkError|Load failed|FETCH_FAILED/.test(raw)) return window.kadrNative ? 'brak połączenia z internetem lub serwerem' : 'brak połączenia lub blokada CORS (użyj aplikacji desktopowej)';
+    return raw;
+  },
+  async fetchJson(url, opt, ms = 60000) {
+    try { const r = await this.net(url, opt, ms); if (!r.ok) { let b = ''; try { b = (await r.text()).slice(0, 160); } catch (e) { /* ok */ } throw new Error('HTTP ' + r.status + (b ? ' ' + b : '')); } return await r.json(); }
+    catch (e) { throw new Error(this.niceError(e)); }
   },
   async complete(userText, sysOverride) {
     const c = this.cfg, d = this.DEFAULTS[c.provider] || {}, model = c.model || d.model, sys = sysOverride || this.system();
@@ -200,9 +216,8 @@ Rules: 1-4 characters with ids A,B,C,D; they start apart (two characters are ~4.
   /* obraz AI z darmowego Pollinations (bez klucza); wymaga internetu */
   async image(prompt, w = 1280, h = 720) {
     const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&seed=${Math.floor(Math.random() * 1e6)}`;
-    const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 90000);
-    try { const r = await fetch(url, { signal: ctl.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); const b = await r.blob(); if (!/^image\//.test(b.type)) throw new Error('to nie obraz'); return b; }
-    catch (e) { throw new Error(e.name === 'AbortError' ? 'przekroczono czas oczekiwania' : /Failed to fetch|NetworkError|Load failed/.test(e.message) ? 'brak połączenia lub blokada CORS' : e.message); } finally { clearTimeout(tm); }
+    try { const r = await this.net(url, {}, 90000); if (!r.ok) throw new Error('HTTP ' + r.status); const b = await r.blob(); if (!/^image\//.test(b.type)) throw new Error('to nie obraz'); return b; }
+    catch (e) { throw new Error(this.niceError(e)); }
   },
 };
 
@@ -272,6 +287,7 @@ UI.pAI = function (box) {
   /* ustawienia dostawcy */
   const d = AIProv.DEFAULTS[A.provider] || {};
   box.append(h('div', { class: 'card2' }, h('h5', {}, 'Ustawienia AI (opcjonalne)'),
+    window.kadrNative ? h('p', { class: 'hint' }, 'Aplikacja desktopowa: połączenia z AI idą przez aplikację, więc nic ich nie blokuje, a ustawienia zostają po zamknięciu.') : null,
     F.hint('Domyślnie nie potrzebujesz żadnego AI. Jeśli chcesz, aby AI układało scenariusze, wybierz dostawcę. Ollama działa lokalnie i jest darmowa; Gemini i OpenRouter mają darmowe plany. Klucz jest zapisany tylko w tej przeglądarce/aplikacji i nie trafia do nas.'),
     F.select('Dostawca', AIProv.PROVIDERS, () => A.provider, (v) => { A.provider = v; AIProv.save(); UI.renderPanel(true); }),
     A.provider !== 'local' ? h('div', { class: 'aiform' },

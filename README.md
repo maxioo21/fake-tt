@@ -55,6 +55,7 @@ npm run dist                  # instalator w katalogu release/
 - **Styl klockowy** (jak w grach z klockami, ale własne klocki — bez oficjalnych postaci, nazw i tekstur): postacie z sześcianów, świat z klocków (dzień, noc, jaskinia, lawa), czynności „kopie kilofem”, „buduje”, „walczy mieczem”, „wybucha” oraz gotowe wyglądy: zombie, szkielet, zielony potwór. Wystarczy napisać np. „szkielet walczy mieczem z zombie na klockowej łące”.
 - **Własne ruchy wymyślane przez AI:** gdy do opisu nie pasuje żadna z gotowych czynności, podłączone AI (patrz niżej) może zaprojektować nowy ruch jako klatki kluczowe (kąty stawów w czasie). Silnik go zagra, więc nie jesteś ograniczony do wbudowanej listy.
 - **Opcjonalnie dowolne AI** (AI → Ustawienia AI): Ollama (lokalnie, za darmo), Google Gemini (darmowy klucz), dowolne API zgodne z OpenAI (OpenRouter, Groq, LM Studio…). Model układa swobodniejszy scenariusz, a ten sam silnik go rysuje. Klucze zostają tylko na Twoim urządzeniu. Gdy AI nie odpowie, używany jest planer lokalny.
+- **W aplikacji desktopowej** połączenia z AI idą przez proces aplikacji, więc nie blokuje ich CORS (Ollama, Gemini, OpenRouter i inne działają bez dodatkowej konfiguracji), a ustawienia (adres, klucz, model) zostają po zamknięciu programu — aplikacja ma stały adres wewnętrzny. W przeglądarce/PWA część usług może być zablokowana przez CORS.
 - **Obraz AI** (Pollinations, bezpłatnie, wymaga internetu): generuje obraz z opisu i dodaje go do biblioteki.
 - Asystent napisów/haszatagów może korzystać z tego samego podłączonego AI zamiast Claude.
 
