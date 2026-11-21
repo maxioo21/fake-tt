@@ -81,7 +81,7 @@ h3, h4 { margin: 0; }
 .tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 9px; }
 .tgrid.sm { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 7px; }
 .tile { display: flex; flex-direction: column; gap: 5px; padding: 0; background: transparent; border: 0; text-align: center; min-width: 0; }
-.tcv { width: 100%; aspect-ratio: 120/76; height: auto; border-radius: 9px; border: 1.5px solid var(--line); background: var(--panel2); display: block; }
+.tcv { width: 100%; aspect-ratio: 168/106; height: auto; border-radius: 9px; border: 1.5px solid var(--line); background: var(--panel2); display: block; }
 .tile:hover .tcv { border-color: var(--line2); }
 .tile.on .tcv { border-color: var(--acc); box-shadow: 0 0 0 2px var(--accsoft); }
 .tl { font-size: 11px; color: var(--mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -287,3 +287,5 @@ input[type=checkbox] { position: absolute; opacity: 0; }
 .junc:not(.has) { opacity: 0; transition: opacity .12s; }
 .lane:hover .junc, .junc:focus-visible { opacity: 1; }
 @media (hover: none) { .junc:not(.has) { opacity: .85; } }
+
+.tgrid.anim { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }

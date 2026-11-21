@@ -143,12 +143,15 @@ UI.rLooks = function (box) {
   LOOKS.filter((l) => l.cat === cur).forEach((l) => {
     const fake = newClip('image'); l.apply(fake);
     grid.append(tile(l.name, (x, w, hh, p, tm) => {
+      const sc = sceneCanvases()[0];
+      x.drawImage(sc, 0, 0);
       const cv = POOL.get(w, hh), cx = cv.getContext('2d');
       if (HAS_FILTER) cx.filter = cssFilter(fake, hh);
-      cx.drawImage(sceneCanvases()[0], 0, 0); cx.filter = 'none';
+      cx.drawImage(sc, 0, 0); cx.filter = 'none';
       applyOverlays(cv, overlayList(fake), 0.4); applyEffects(cv, fake.fx, p == null ? 0.37 : tm + 0.2);
-      x.drawImage(cv, 0, 0); POOL.free(cv);
-      if (fake.curve && fake.curve !== 'none') { x.fillStyle = 'rgba(0,0,0,.55)'; x.fillRect(w - 24, 4, 20, 14); x.fillStyle = '#ffb454'; x.font = '700 10px sans-serif'; x.fillText('⚡', w - 19, 15); }
+      x.save(); x.beginPath(); x.rect(w * 0.4, 0, w * 0.6, hh); x.clip(); x.drawImage(cv, 0, 0); x.restore(); POOL.free(cv);
+      x.fillStyle = 'rgba(255,255,255,.9)'; x.fillRect(w * 0.4 - 1, 0, 2, hh);
+      if (fake.curve && fake.curve !== 'none') { x.fillStyle = 'rgba(0,0,0,.65)'; x.fillRect(w - 30, 4, 26, 15); x.fillStyle = '#ffb454'; x.font = '700 11px sans-serif'; x.fillText('⚡', w - 25, 16); }
     }, { onclick: () => Looks.apply(l) }));
   });
   box.append(grid, F.btn('Usuń look z klipów', () => Looks.clear(), 'block', 'x'));
