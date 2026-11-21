@@ -5,7 +5,7 @@
 const mixHex = (a, b, k) => { const x = hex2rgb(a), y = hex2rgb(b); return '#' + [0, 1, 2].map((i) => Math.round(x[i] + (y[i] - x[i]) * k).toString(16).padStart(2, '0')).join(''); };
 const COLS = [['czerwony', '#ff3b3b'], ['pomarańczowy', '#ff8a1f'], ['żółty', '#ffe14d'], ['limonkowy', '#b6ff3b'], ['zielony', '#2bff7a'], ['turkusowy', '#1ff2d0'], ['cyjan', '#27e1ff'], ['niebieski', '#3b82ff'], ['fioletowy', '#8b5cff'], ['różowy', '#ff4fb8'], ['magenta', '#ff2bd6'], ['biały', '#ffffff']];
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-TEXT_CATS.splice(0, TEXT_CATS.length, 'Popularne', 'Szablony', 'Sport / edit', 'Neon', 'Poświata', 'Rozmyte', 'Gradient', 'Metaliczne', '3D / cień', 'Komiks', 'Retro', 'Elegancja', 'Zabawa', 'Etykiety', 'Napisy');
+TEXT_CATS.splice(0, TEXT_CATS.length, 'Popularne', 'Szablony', 'Przezroczyste', 'Zmienne kolory', 'Galaktyka i brokat', 'Sport / edit', 'Neon', 'Poświata', 'Rozmyte', 'Gradient', 'Metaliczne', '3D / cień', 'Komiks', 'Retro', 'Elegancja', 'Zabawa', 'Etykiety', 'Napisy');
 
 /* ---------- Neon (kolory × czcionki) ---------- */
 COLS.forEach(([n, c]) => {
@@ -70,6 +70,53 @@ TS('Napisy: żółte tło', 'Napisy', { font: 'Poppins', bold: true, color: '#11
 TS('Napisy: kinowe', 'Napisy', { font: 'Playfair Display', bold: false, italic: true, color: '#fff7dc', shadowB: 0.25, size: 0.06 });
 TS('Napisy: cienkie', 'Napisy', { font: 'Syne', bold: false, color: '#ffffff', shadowB: 0.3, spacing: 0.06, size: 0.05 });
 
+/* ---------- Przezroczyste (szkło): widać obraz przez litery ---------- */
+[['biały', '#ffffff'], ['różowy', '#ff4fb8'], ['cyjan', '#27e1ff'], ['zielony', '#2bff7a'], ['fioletowy', '#a78bff'], ['złoty', '#ffe14d'], ['czerwony', '#ff4d4d'], ['niebieski', '#5b8cff']].forEach(([n, c]) => {
+  TS('Szkło ' + n, 'Przezroczyste', { font: 'Archivo Black', bold: false, color: c, fillA: 0.22, strokeC: mixHex(c, '#ffffff', 0.65), strokeW: 0.035, strokeA: 0.95, glowC: c, glowA: 0.7, glowB: 0.6, upper: true, cblend: 'screen' });
+  TS('Szkło wąskie ' + n, 'Przezroczyste', { font: 'Anton', bold: false, color: c, fillA: 0.3, strokeC: mixHex(c, '#ffffff', 0.5), strokeW: 0.03, strokeA: 0.9, glowC: c, glowA: 0.9, glowB: 0.8, upper: true, spacing: 0.03, cblend: 'screen' });
+});
+TS('Szkło mgła', 'Przezroczyste', { font: 'Archivo Black', bold: false, color: '#ffffff', fillA: 0.35, blur: 0.18, glowC: '#ffffff', glowA: 0.8, glowB: 0.9, upper: true, cblend: 'screen' });
+TS('Folia 50%', 'Przezroczyste', { font: 'Montserrat', bold: true, color: '#ffffff', fillA: 0.5, strokeC: '#ffffff', strokeW: 0.02, strokeA: 0.8, upper: true });
+TS('Sam kontur (pusty środek)', 'Przezroczyste', { font: 'Archivo Black', bold: false, color: '#ffffff', fillA: 0, strokeC: '#ffffff', strokeW: 0.05, strokeA: 1, glowC: '#ffffff', glowA: 0.6, glowB: 0.5, upper: true });
+TS('Kontur neonowy (pusty)', 'Przezroczyste', { font: 'Anton', bold: false, color: '#ff2bd6', fillA: 0.08, strokeC: '#ff6be6', strokeW: 0.045, strokeA: 1, glowC: '#ff2bd6', glowA: 1.3, glowB: 0.9, upper: true });
+TS('Duch przezroczysty', 'Przezroczyste', { font: 'Poppins', bold: true, color: '#ffffff', fillA: 0.28, blur: 0.08, glowC: '#ffffff', glowA: 0.9, glowB: 0.9, cblend: 'screen' });
+TS('Lód przezroczysty', 'Przezroczyste', { font: 'Archivo Black', bold: false, color: '#bfeaff', fillA: 0.35, strokeC: '#ffffff', strokeW: 0.03, glowC: '#4fc3ff', glowA: 1, glowB: 0.8, upper: true, cblend: 'screen' });
+TS('Nakładka (overlay)', 'Przezroczyste', { font: 'Archivo Black', bold: false, color: '#ffffff', upper: true, cblend: 'overlay' });
+TS('Miękkie światło', 'Przezroczyste', { font: 'Archivo Black', bold: false, color: '#ffffff', upper: true, cblend: 'soft-light' });
+TS('Różnica (odwraca kolory tła)', 'Przezroczyste', { font: 'Anton', bold: false, color: '#ffffff', upper: true, cblend: 'difference' });
+/* ---------- Zmienne kolory (płynnie zmieniające się) ---------- */
+[['Różowo-fioletowy', ['#ff2d95', '#8b5cff']], ['Cyjan-niebieski', ['#27e1ff', '#3b82ff']], ['Zielono-żółty', ['#2bff7a', '#ffe14d']], ['Czerwono-pomarańczowy', ['#ff3b3b', '#ff8a1f']], ['Złoto-biały', ['#ffe14d', '#ffffff']], ['Fiolet-cyjan', ['#8b5cff', '#27e1ff']], ['Różowo-żółto-cyjan', ['#ff4fb8', '#ffe14d', '#27e1ff']], ['Mięta-róż', ['#1ff2d0', '#ff4fb8']], ['Zachód', ['#ff8a1f', '#ff2d95', '#8b5cff']], ['Neon trio', ['#27e1ff', '#ff2bd6', '#b6ff3b']], ['Lód-fiolet', ['#ffffff', '#6fd3ff', '#8b5cff']], ['Ogień', ['#fff200', '#ff2a00']]].forEach(([n, cols]) => {
+  const base = { font: 'Archivo Black', bold: false, color: cols[0], fill2: cols[1], fill3: cols[2] || '', fillMode: 'shift', fillSpeed: 1, strokeC: mixHex(cols[0], '#000000', 0.6), strokeW: 0.04, upper: true };
+  TS(n + ' (zmiana)', 'Zmienne kolory', Object.assign({}, base, { fillSpread: 0, glowC: cols[0], glowA: 0.5, glowB: 0.5 }));
+  TS(n + ' (płynący)', 'Zmienne kolory', Object.assign({}, base, { fillSpread: 1, fillSpeed: 1.2 }));
+  TS(n + ' + poświata', 'Zmienne kolory', Object.assign({}, base, { fillSpread: 1, glowCycle: true, glowA: 1.2, glowB: 0.9, strokeW: 0, font: 'Poppins', bold: true }));
+});
+TS('Tęcza płynąca', 'Zmienne kolory', { font: 'Archivo Black', bold: false, color: '#ff4d4d', fillMode: 'rainbow', fillSpread: 1, fillSpeed: 1, strokeC: '#000000', strokeW: 0.04, upper: true });
+TS('Tęcza (jeden kolor)', 'Zmienne kolory', { font: 'Archivo Black', bold: false, color: '#ff4d4d', fillMode: 'rainbow', fillSpread: 0, fillSpeed: 1, strokeC: '#000000', strokeW: 0.04, upper: true });
+TS('Tęcza + poświata', 'Zmienne kolory', { font: 'Poppins', bold: true, color: '#ff4d4d', fillMode: 'rainbow', fillSpread: 1, glowCycle: true, glowA: 1.2, glowB: 0.9, upper: true });
+TS('Zmienny kontur', 'Zmienne kolory', { font: 'Archivo Black', bold: false, color: '#ffffff', fill2: '#ff2d95', fill3: '#27e1ff', fillMode: 'solid', strokeC: '#ff2d95', strokeW: 0.07, strokeCycle: true, upper: true });
+TS('Przezroczysty + zmienny kolor', 'Zmienne kolory', { font: 'Archivo Black', bold: false, color: '#ff2d95', fill2: '#8b5cff', fill3: '#27e1ff', fillMode: 'shift', fillSpread: 1, fillA: 0.4, strokeC: '#ffffff', strokeW: 0.03, strokeA: 0.9, glowCycle: true, glowA: 1, glowB: 0.8, upper: true, cblend: 'screen' });
+/* ---------- Galaktyka i brokat (jak „kosmiczne” napisy w CapCut: gradient + iskry w literach) ---------- */
+const GAL = [['różowa', ['#ff2d95', '#c026d3', '#7c3aed']], ['niebieska', ['#27e1ff', '#3b82ff', '#8b5cff']], ['zielona', ['#2bff7a', '#14b8a6', '#27e1ff']], ['złota', ['#ffe14d', '#ff8a1f', '#ff3b3b']], ['ognista', ['#fff200', '#ff2a00', '#a50014']], ['lodowa', ['#ffffff', '#6fd3ff', '#3b82ff']], ['fioletowa', ['#8b5cff', '#ff2bd6', '#27e1ff']], ['mgławica', ['#ff4fb8', '#27e1ff', '#ffe14d']]];
+GAL.forEach(([n, cols]) => {
+  const t = { font: 'Archivo Black', bold: false, color: cols[0], fill2: cols[1], fill3: cols[2], fillMode: 'galaxy', fillSpeed: 0.5, fillSpread: 0.8, spark: 0.6, sparkC: '#ffffff', fillA: 0.92, strokeC: mixHex(cols[0], '#000000', 0.55), strokeW: 0.05, strokeA: 0.9, glowC: cols[0], glowA: 0.6, glowB: 0.6, upper: true, spacing: 0.01 };
+  TS('Galaktyka ' + n, 'Galaktyka i brokat', t);
+  TS('Galaktyka ' + n + ' (przezroczysta)', 'Galaktyka i brokat', Object.assign({}, t, { fillA: 0.5, cblend: 'screen', strokeA: 0.8 }));
+});
+[['Złoty brokat', ['#ffe14d', '#ffb300', '#fff3b0']], ['Srebrny brokat', ['#ffffff', '#b6c2d1', '#e8eef6']], ['Różowy brokat', ['#ff7ac8', '#ff2d95', '#ffd1ec']], ['Holo brokat', ['#ff7ac8', '#7ae6ff', '#c6ff7a']], ['Niebieski brokat', ['#6fd3ff', '#3b82ff', '#cfeaff']], ['Różowe złoto', ['#ffd7cc', '#e08c7a', '#fff0ea']]].forEach(([n, cols]) =>
+  TS(n, 'Galaktyka i brokat', { font: 'Archivo Black', bold: false, color: cols[0], fill2: cols[1], fill3: cols[2], fillMode: 'glitter', fillSpeed: 0.8, fillSpread: 0.6, spark: 0.8, sparkC: '#ffffff', strokeC: mixHex(cols[1], '#000000', 0.55), strokeW: 0.04, upper: true }));
+
+TEXT_STYLES.filter((s) => ['Przezroczyste', 'Zmienne kolory', 'Galaktyka i brokat'].includes(s.cat)).forEach((s) => { if (!s.t.size) s.t.size = 0.12; });
+
+/* ---------- zastosowanie stylu do klipu (tekst, tryb mieszania, krycie, animacje) ---------- */
+function applyTextStyle(c, style, anim) {
+  Object.assign(c.text, styleFull(style));
+  if (style.size) c.text.size = style.size;
+  c.blend = style.cblend || 'normal';
+  if (style.copacity != null) c.opacity = style.copacity;
+  if (anim) applyTextAnim(c, anim);
+}
+
 /* ---------- Szablony z animacją ---------- */
 const TPL = (name, t, a) => TEXT_STYLES.push({ name, cat: 'Szablony', t, a });
 const IN = (id, dur = 1) => ({ id, dur }), LOOP = (id, amt = 1) => ({ id, amt });
@@ -96,6 +143,9 @@ TPL('Złoty wjazd', { font: 'Playfair Display', bold: true, color: '#fff2b8', fi
 TPL('Słowa po kolei', { font: 'Poppins', bold: true, color: '#ffffff', shadowB: 0.2 }, { in: IN('bounceWords', 1.2) });
 TPL('Drżący horror', { font: 'Rye', bold: false, color: '#ff3b3b', blur: 0.1, glowC: '#ff0000', glowA: 1, glowB: 0.7 }, { in: IN('fadeLetters', 1), loop: LOOP('shakeLetters') });
 TPL('Dolny pasek', { font: 'Teko', bold: true, color: '#ffffff', bg: '#0b3d91', bgA: 0.95, bgR: 0.06, upper: true, spacing: 0.04 }, { in: IN('wipeL', 0.5), out: IN('wipeL', 0.4) });
+TPL('Galaktyka: wejście', { font: 'Archivo Black', bold: false, color: '#ff2d95', fill2: '#c026d3', fill3: '#7c3aed', fillMode: 'galaxy', fillSpeed: 0.5, spark: 0.6, fillA: 0.92, strokeC: '#6b0b57', strokeW: 0.05, glowC: '#ff2d95', glowA: 0.6, upper: true }, { in: IN('zoomLetters', 1), out: IN('fadeLetters', 0.5) });
+TPL('Szkło: odsłonięcie', { font: 'Archivo Black', bold: false, color: '#ffffff', fillA: 0.22, strokeC: '#ffffff', strokeW: 0.035, glowC: '#ffffff', glowA: 0.8, upper: true, cblend: 'screen' }, { in: IN('wipeL', 0.9), out: IN('blurText', 0.6) });
+TPL('Tęcza: fala', { font: 'Archivo Black', bold: false, color: '#ff4d4d', fillMode: 'rainbow', fillSpread: 1, strokeC: '#000000', strokeW: 0.04, upper: true }, { in: IN('letters', 0.9), loop: LOOP('wave') });
 TPL('Hype: uderzenie', { font: 'Anton', bold: false, color: '#ffe600', strokeC: '#000000', strokeW: 0.16, upper: true, hardC: '#000', hardD: 0.04 }, { in: IN('punchin', 0.25), loop: LOOP('zoompunch') });
 
 /* ---------- zastosowanie stylu (z animacją szablonu) ---------- */
@@ -106,10 +156,13 @@ function applyTextAnim(c, a) {
   c.animLoop = a.loop ? { id: a.loop.id, amt: a.loop.amt } : { id: 'none', amt: 1 };
 }
 /* ---------- panel tekstu: kategorie + duży podgląd po najechaniu (z animacją szablonu) ---------- */
-function textStylePreview(x, w, hh, p, style) {
-  const big = w > 220;
-  const T = Object.assign(defText(big ? 'Twój napis' : 'Aa'), styleFull(style.t));
+function textStylePreview(x, w, hh, p, style, tm) {
+  const big = w > 220, t = style.t;
+  const T = Object.assign(defText(big ? 'Twój napis' : 'Aa'), styleFull(t));
+  const animFill = ['shift', 'rainbow', 'galaxy', 'glitter'].includes(T.fillMode) || T.glowCycle || T.strokeCycle;
+  const seeThrough = (T.fillA != null && T.fillA < 0.9) || (t.cblend && t.cblend !== 'normal');
   let tfx = null, st = { dx: 0, dy: 0, s: 1, r: 0, al: 1, bl: 0, fl: 1, fy: 1, cl: null };
+  const clock = p == null ? 1.2 : (tm || 0);
   if (p != null && style.a) {
     const lt = p * 2.6, fake = { dur: 4, animIn: style.a.in || { id: 'none', dur: 1 }, animOut: { id: 'none', dur: 0.5 }, animLoop: style.a.loop || { id: 'none', amt: 1 } };
     st = animState(fake, lt);
@@ -117,21 +170,25 @@ function textStylePreview(x, w, hh, p, style) {
     if (TEXT_IN_MODES.includes(ai.id) && lt < ai.dur) tfx = { mode: ai.id, p: clamp(lt / ai.dur, 0, 1), t: lt };
     else if (TEXT_LOOP_MODES.includes(fake.animLoop.id)) tfx = { mode: fake.animLoop.id, t: lt, p: 1 };
   }
+  if (animFill) tfx = tfx || { mode: 'fill', t: clock, p: 1 };
+  if (tfx && tfx.t == null) tfx.t = clock;
   T.size = big ? 0.2 : 0.5;
   const ref = big ? hh * 1.3 : hh * 1.2, refW = big ? w * 1.3 : ref;
   const sp = makeTextSprite(T, refW, ref, tfx);
   /* skalujemy według samego napisu (bez marginesów na poświatę i cień), żeby litery były duże */
-  const plain = Object.assign({}, T, { shadowB: 0, glowA: 0, blur: 0, strokeW: 0, out2W: 0, hardD: 0, shD: 0, bg: '', ul: false });
+  const plain = Object.assign({}, T, { shadowB: 0, glowA: 0, blur: 0, strokeW: 0, out2W: 0, hardD: 0, shD: 0, bg: '', ul: false, fillMode: 'solid' });
   const tight = makeTextSprite(plain, refW, ref, null), padT = 0.5 * T.size * Math.min(refW, ref);
   const k = Math.min((w * 0.84) / Math.max(1, tight.width - padT), (hh * 0.7) / Math.max(1, tight.height - padT), big ? 2.2 : 1.6);
-  x.fillStyle = big ? '#1b1e29' : '#23262f'; x.fillRect(0, 0, w, hh);
+  if (seeThrough) { x.drawImage(sceneFor(w, hh, 0), 0, 0); x.fillStyle = 'rgba(0,0,0,.18)'; x.fillRect(0, 0, w, hh); }   /* tło, przez które widać przezroczysty napis */
+  else { x.fillStyle = big ? '#1b1e29' : '#23262f'; x.fillRect(0, 0, w, hh); }
   x.save(); x.beginPath(); x.rect(0, 0, w, hh); x.clip();
   x.translate(w / 2 + st.dx * w, hh / 2 + st.dy * hh); x.rotate(st.r); x.scale(st.s * st.fl, st.s * st.fy); x.globalAlpha = clamp(st.al, 0, 1);
+  if (t.cblend && t.cblend !== 'normal') x.globalCompositeOperation = blendOp(t.cblend);
   if (HAS_FILTER && st.bl > 0.001) x.filter = `blur(${(st.bl * hh).toFixed(1)}px)`;
   if (st.cl) { x.beginPath(); x.rect(-sp.width * k / 2 + st.cl.l * sp.width * k, -sp.height * k / 2 + st.cl.t * sp.height * k, Math.max(0, sp.width * k * (1 - st.cl.l - st.cl.r)), Math.max(0, sp.height * k * (1 - st.cl.t - st.cl.b))); x.clip(); }
   x.drawImage(sp, -sp.width * k / 2, -sp.height * k / 2, sp.width * k, sp.height * k);
   x.restore();
-  if (style.a) { x.font = `800 ${Math.round(hh * 0.09)}px sans-serif`; x.textAlign = 'right'; x.fillStyle = 'rgba(255,180,84,.95)'; x.fillText('▶ animacja', w - 6, hh - 6); }
+  if (style.a || animFill) { x.font = `800 ${Math.round(hh * 0.09)}px sans-serif`; x.textAlign = 'right'; x.fillStyle = 'rgba(255,180,84,.95)'; x.fillText(style.a ? '▶ animacja' : '▶ kolory', w - 6, hh - 6); }
 }
 UI.pText = function (box) {
   const sel = byId(S.sel), isText = sel && sel.type === 'text', cur = this.catState.text;
@@ -141,7 +198,7 @@ UI.pText = function (box) {
   const list = TEXT_STYLES.filter((s) => s.cat === cur);
   UI.loadFonts([...new Set(list.map((s) => s.t.font).filter(Boolean))]);
   const grid = h('div', { class: 'tgrid' });
-  list.forEach((s) => grid.append(tile(s.name, (x, w, hh, p) => textStylePreview(x, w, hh, p, s), { anim: !!s.a, drag: { kind: 'text', style: s.t, anim: s.a }, onclick: () => App.addText(null, s.t, s.a), popTitle: s.name + (s.a ? ' · z animacją' : '') })));
+  list.forEach((s) => grid.append(tile(s.name, (x, w, hh, p, tm) => textStylePreview(x, w, hh, p, s, tm), { anim: !!s.a || ['shift', 'rainbow', 'galaxy', 'glitter'].includes(s.t.fillMode) || !!s.t.glowCycle || !!s.t.strokeCycle, drag: { kind: 'text', style: s.t, anim: s.a }, onclick: () => App.addText(null, s.t, s.a), popTitle: s.name + (s.a ? ' · z animacją' : (s.t.fillMode && ['shift', 'rainbow', 'galaxy', 'glitter'].includes(s.t.fillMode) ? ' · zmienne kolory' : '')) })));
   box.append(grid);
 };
 
@@ -173,20 +230,39 @@ UI.insText = function (b, c) {
     A(F.seg('Wyrównanie', [['left', 'Lewo'], ['center', 'Środek'], ['right', 'Prawo']], () => T.align, (v) => { T.align = v; }));
     A(F.btn('Resetuj styl tekstu', () => { Object.assign(T, styleFull({}), { glowA: 0, blur: 0, shD: null, shAng: 90, shA: 1, ul: false, strokeA: 1, gradAng: 90, bgR: 0.22, bgP: 0.32, glowB: 0.5 }); commit(); }, 'sm', 'rotate'));
   } else if (this.textSub === 'color') {
-    A(F.color('Kolor tekstu', () => T.color, (v) => { T.color = v; }));
-    A(F.toggle('Gradient', () => !!T.fill2, (v) => { T.fill2 = v ? (T.fill2 || '#ff2d95') : ''; }));
-    if (T.fill2) { A(F.color('Drugi kolor', () => T.fill2, (v) => { T.fill2 = v; })); A(F.sn('Kąt gradientu', () => T.gradAng == null ? 90 : T.gradAng, (v) => { T.gradAng = v; }, 0, 360, 1, 1, '°')); }
-    A(F.hint('Krycie całego napisu ustawisz w „Podstawowe → Krycie”.'));
+    const mode = T.fillMode || (T.fill2 ? 'gradient' : 'solid'), animated = ['shift', 'rainbow', 'galaxy', 'glitter'].includes(mode);
+    A(F.select('Wypełnienie', [['solid', 'Jednolity'], ['gradient', 'Gradient'], ['shift', 'Zmieniające się kolory'], ['rainbow', 'Tęcza'], ['galaxy', 'Galaktyka (iskry w literach)'], ['glitter', 'Brokat']], () => mode, (v) => { T.fillMode = v; if (v !== 'solid' && v !== 'rainbow' && !T.fill2) T.fill2 = '#ff2d95'; }));
+    if (mode !== 'rainbow') A(F.color('Kolor 1', () => T.color, (v) => { T.color = v; }));
+    if (mode !== 'solid' && mode !== 'rainbow') {
+      A(F.color('Kolor 2', () => T.fill2 || '#ff2d95', (v) => { T.fill2 = v; }));
+      A(F.toggle('Trzeci kolor', () => !!T.fill3, (v) => { T.fill3 = v ? (T.fill3 || '#27e1ff') : ''; }));
+      if (T.fill3) A(F.color('Kolor 3', () => T.fill3, (v) => { T.fill3 = v; }));
+    }
+    if (mode === 'gradient') A(F.sn('Kąt gradientu', () => T.gradAng == null ? 90 : T.gradAng, (v) => { T.gradAng = v; }, 0, 360, 1, 1, '°'));
+    if (animated) {
+      A(F.sn('Szybkość zmiany kolorów', () => T.fillSpeed == null ? 1 : T.fillSpeed, (v) => { T.fillSpeed = v; }, 0, 4, 0.05, 100, '%'));
+      A(F.sn('Rozciągnięcie kolorów', () => T.fillSpread == null ? 1 : T.fillSpread, (v) => { T.fillSpread = v; }, 0, 3, 0.05, 100, '%'));
+      A(F.hint('0% = cały napis zmienia kolor naraz. Więcej = kolory „płyną” przez litery.'));
+    }
+    if (mode === 'galaxy' || mode === 'glitter') {
+      A(F.sn('Gęstość iskier', () => T.spark == null ? 0.5 : T.spark, (v) => { T.spark = v; }, 0, 1, 0.01, 100, '%'));
+      A(F.color('Kolor iskier', () => T.sparkC || '#ffffff', (v) => { T.sparkC = v; }));
+    }
+    A(F.sn('Przezroczystość tekstu (krycie wypełnienia)', () => T.fillA == null ? 1 : T.fillA, (v) => { T.fillA = v; }, 0, 1, 0.01, 100, '%'));
+    A(F.btn('Zrób przezroczysty (szkło)', () => { T.fillA = 0.25; T.strokeC = '#ffffff'; T.strokeW = Math.max(T.strokeW, 0.035); T.strokeA = 0.95; T.glowA = Math.max(T.glowA || 0, 0.7); T.glowB = 0.6; c.blend = 'screen'; commit(); }, 'sm', 'sparkles'));
+    A(F.hint('Efekt szkła: niskie krycie wypełnienia + jasny obrys i poświata, a w „Podstawowe” tryb mieszania „Rozjaśnij”. Krycie całego klipu: „Podstawowe → Krycie”.'));
   } else if (this.textSub === 'stroke') {
     A(F.color('Kolor obrysu', () => T.strokeC, (v) => { T.strokeC = v; }));
     A(F.sn('Grubość obrysu', () => T.strokeW, (v) => { T.strokeW = v; }, 0, 0.4, 0.005, 100));
     A(F.sn('Krycie obrysu', () => T.strokeA == null ? 1 : T.strokeA, (v) => { T.strokeA = v; }, 0, 1, 0.01, 100, '%'));
+    A(F.toggle('Kolor obrysu zmienia się (kolory z zakładki Kolor)', () => !!T.strokeCycle, (v) => { T.strokeCycle = v; }));
     A(F.title('Drugi obrys'));
     A(F.color('Kolor', () => T.out2C, (v) => { T.out2C = v; }));
     A(F.sn('Grubość', () => T.out2W, (v) => { T.out2W = v; }, 0, 0.2, 0.005, 100));
   } else if (this.textSub === 'glow') {
     A(F.hint('Poświata jak w CapCut: kolorowa łuna wokół liter.'));
-    A(F.color('Kolor poświaty', () => T.glowC || '#ffffff', (v) => { T.glowC = v; }));
+    A(F.toggle('Kolor poświaty zmienia się (kolory z zakładki Kolor)', () => !!T.glowCycle, (v) => { T.glowCycle = v; }));
+    if (!T.glowCycle) A(F.color('Kolor poświaty', () => T.glowC || '#ffffff', (v) => { T.glowC = v; }));
     A(F.sn('Intensywność', () => T.glowA || 0, (v) => { T.glowA = v; }, 0, 1.6, 0.01, 100, '%'));
     A(F.sn('Rozmiar (rozmycie)', () => T.glowB == null ? 0.5 : T.glowB, (v) => { T.glowB = v; }, 0, 1.5, 0.01, 100));
   } else if (this.textSub === 'shadow') {

@@ -6,7 +6,7 @@
 TEXT_FONTS.push('Bangers', 'Black Ops One', 'Oswald', 'Poppins', 'Orbitron', 'Press Start 2P', 'Russo One', 'Staatliches', 'Teko', 'Archivo Black', 'Abril Fatface', 'Dancing Script', 'Satisfy', 'Shadows Into Light', 'Luckiest Guy', 'Fredoka', 'Monoton', 'Bungee', 'Syne', 'DM Serif Display', 'Great Vibes', 'Rye');
 const TEXT_CATS = ['Popularne', 'Sport / edit', 'Neon', 'Retro', 'Elegancja', 'Zabawa', 'Etykiety', 'Napisy'];
 TEXT_STYLES.forEach((s) => { s.cat = s.cat || 'Popularne'; });
-const STYLE_BASE = { font: 'Montserrat', bold: true, italic: false, upper: false, color: '#ffffff', fill2: '', strokeC: '#000000', strokeW: 0, out2C: '#000000', out2W: 0, hardC: '#000000', hardD: 0, shadowC: '#000000', shadowB: 0, bg: '', bgA: 0.7, spacing: 0, lineH: 1.15 };
+const STYLE_BASE = { font: 'Montserrat', bold: true, italic: false, upper: false, color: '#ffffff', fill2: '', fill3: '', fillMode: '', fillA: 1, fillSpeed: 1, fillSpread: 1, spark: 0.5, sparkC: '#ffffff', gradAng: 90, strokeC: '#000000', strokeW: 0, strokeA: 1, strokeCycle: false, out2C: '#000000', out2W: 0, hardC: '#000000', hardD: 0, shadowC: '#000000', shadowB: 0, shA: 1, shD: null, shAng: 90, glowC: '#ffffff', glowB: 0.5, glowA: 0, glowCycle: false, blur: 0, ul: false, bg: '', bgA: 0.7, bgR: 0.22, bgP: 0.32, spacing: 0, lineH: 1.15, cblend: 'normal' };
 const styleFull = (t) => Object.assign({}, STYLE_BASE, t);
 const TS = (name, cat, t) => TEXT_STYLES.push({ name, cat, t });
 TS('Stadion', 'Sport / edit', { font: 'Anton', bold: false, color: '#ffffff', hardC: '#e11d48', hardD: 0.055, upper: true, spacing: 0.03 });

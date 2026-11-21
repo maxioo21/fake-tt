@@ -117,14 +117,13 @@ const AutoEdit = {
 
 /* ---------- dodawanie tekstu ze stylem i animacją szablonu ---------- */
 App.addText = function (str, style, anim) {
-  const sel = byId(S.sel), full = style ? styleFull(style) : null;
-  if (full && sel && sel.type === 'text') { Object.assign(sel.text, full); if (style.size) sel.text.size = style.size; applyTextAnim(sel, anim); commit(); if (anim) Tools.previewClip(sel, 'in'); return; }
-  const c = addTextClip(str || 'Twój tekst', full || undefined);
-  if (style && style.size) c.text.size = style.size;
-  if (anim) { applyTextAnim(c, anim); c.dur = Math.max(c.dur, 3); } else c.animIn = { id: 'fade', dur: 0.5 };
+  const sel = byId(S.sel);
+  if (style && sel && sel.type === 'text') { applyTextStyle(sel, style, anim); commit(); if (anim) Tools.previewClip(sel, 'in'); return; }
+  const c = addTextClip(str || 'Twój tekst', style ? styleFull(style) : undefined);
+  if (style) applyTextStyle(c, style, anim); else c.animIn = { id: 'fade', dur: 0.5 };
+  if (anim) c.dur = Math.max(c.dur, 3);
   UI.insTab = 'text'; commit();
   Engine.seek(c.start + 0.2);
   if (anim) Tools.previewClip(c, 'in');
   const ta = $('#inspector textarea'); if (ta && !document.body.dataset.mobile) { ta.focus(); ta.select(); }
 };
-

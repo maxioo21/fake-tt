@@ -7,9 +7,24 @@ const TEXT_FONTS = ['Montserrat', 'Anton', 'Bebas Neue', 'Playfair Display', 'Pa
 const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
 /* ---------- sprite tekstu (ustawienia jak w CapCut: poświata, cień, obrys, rozmycie, gradient, tło…) ---------- */
+
+/* paleta kolorów (zmienne wypełnienie, poświata i obrys) */
+const rgbOf = (c) => (typeof c === 'string' && c[0] === '#' ? hex2rgb(c) : [255, 255, 255]);
+function palAt(cols, u) {
+  u = ((u % 1) + 1) % 1; const n = cols.length;
+  if (n === 1) return rgbOf(cols[0]);
+  const f = u * n, i = Math.floor(f), k = f - i, a = rgbOf(cols[i % n]), b = rgbOf(cols[(i + 1) % n]), e = k * k * (3 - 2 * k);
+  return [lerp(a[0], b[0], e), lerp(a[1], b[1], e), lerp(a[2], b[2], e)];
+}
+const rgbaA = (c, a) => `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${a})`;
+function starC(x, cx, cy, r, a, col) {
+  x.save(); x.globalAlpha = clamp(a, 0, 1); x.fillStyle = col;
+  x.beginPath(); x.moveTo(cx - r, cy); x.quadraticCurveTo(cx, cy, cx, cy - r); x.quadraticCurveTo(cx, cy, cx + r, cy); x.quadraticCurveTo(cx, cy, cx, cy + r); x.quadraticCurveTo(cx, cy, cx - r, cy); x.fill();
+  x.restore();
+}
 const TEXT_IN_MODES = ['typewriter', 'letters', 'words', 'dropletters', 'blurText', 'slideLetters', 'zoomLetters', 'rotateLetters', 'fadeLetters', 'scramble', 'bounceWords', 'flipLetters', 'neonOn', 'lineIn', 'typeCaret', 'glitchLetters'];
 const TEXT_LOOP_MODES = ['wave', 'rainbow', 'jumpLetters', 'shakeLetters', 'neonFlicker', 'glowPulse', 'colorCycle', 'blurPulse'];
-const TEXT_SPRITE_ONLY = ['typewriter', 'typeCaret', 'glowPulse', 'blurPulse'];
+const TEXT_SPRITE_ONLY = ['typewriter', 'typeCaret', 'glowPulse', 'blurPulse', 'fill'];
 const SCRAMBLE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&@*';
 function makeTextSprite(T, W, H, tfx) {
   const fs = Math.max(8, Math.round(T.size * Math.min(W, H)));
@@ -46,6 +61,13 @@ function makeTextSprite(T, W, H, tfx) {
   const glowA = glowBase * pulse;
   const blurAmt = tfx && tfx.mode === 'blurPulse' ? (0.5 + 0.5 * Math.sin((tfx.t || 0) * 3)) * 0.6 : (T.blur || 0);
   const bgP = fs * (T.bgP == null ? 0.32 : T.bgP), bgR = fs * (T.bgR == null ? 0.22 : T.bgR);
+  const ft = tfx && tfx.t != null ? tfx.t : 0, fSpeed = T.fillSpeed == null ? 1 : T.fillSpeed, fSpread = T.fillSpread == null ? 1 : T.fillSpread, fa = T.fillA == null ? 1 : T.fillA;
+  const fmode = T.fillMode || (T.fill2 ? 'gradient' : 'solid');
+  const palList = [T.color, T.fill2 || T.color, T.fill3 || ''].filter((c) => c && c[0] === '#');
+  const cyc = (phase, a) => (fmode === 'rainbow' ? `hsla(${Math.floor(((phase % 1) + 1) % 1 * 360)},95%,62%,${a})` : rgbaA(palAt(palList.length ? palList : ['#ffffff'], phase), a));
+  const phase0 = ft * fSpeed * 0.2;
+  const glowStr = (a) => (T.glowCycle ? cyc(phase0, a) : rgba(T.glowC || '#ffffff', a));
+  const strokeStr = () => (T.strokeCycle ? cyc(phase0 + 0.5, T.strokeA == null ? 1 : T.strokeA) : strokeCol);
   const pad = Math.ceil(fs * (0.25 + T.shadowB * 1.4 + Math.abs(sdist) * 1.1 + (glowBase > 0 ? (T.glowB == null ? 0.5 : T.glowB) * 1.1 : 0) + blurAmt * 0.55) + lw + lw2 * 2 + hard + (T.bg ? bgP + fs * 0.05 : 0) + (per ? fs * 0.8 : 0));
   const w = Math.max(fs * 0.5, Math.ceil(tw + pad * 2)), hh = Math.max(fs, Math.ceil(lines.length * lh + pad * 2));
   let cv = mkCanvas(w, hh);
@@ -62,9 +84,18 @@ function makeTextSprite(T, W, H, tfx) {
   const clearShadow = () => { x.shadowColor = 'transparent'; x.shadowBlur = 0; x.shadowOffsetX = 0; x.shadowOffsetY = 0; };
   const makeFill = (fillOver) => {
     if (fillOver) return fillOver;
-    if (!T.fill2) return T.color;
+    const solid = () => (fa < 1 && typeof T.color === 'string' && T.color[0] === '#' ? rgba(T.color, fa) : T.color);
+    if (fmode === 'solid') return solid();
     const a = (T.gradAng == null ? 90 : T.gradAng) * Math.PI / 180, len = Math.abs(w * Math.cos(a)) + Math.abs(hh * Math.sin(a)), gx = Math.cos(a) * len / 2, gy = Math.sin(a) * len / 2;
-    const g = x.createLinearGradient(w / 2 - gx, hh / 2 - gy, w / 2 + gx, hh / 2 + gy); g.addColorStop(0, T.color); g.addColorStop(1, T.fill2); return g;
+    const g = x.createLinearGradient(w / 2 - gx, hh / 2 - gy, w / 2 + gx, hh / 2 + gy);
+    if (fmode === 'gradient') {
+      const cs = [T.color, T.fill2 || T.color, T.fill3 || ''].filter(Boolean), conv = (c) => (c[0] === '#' ? rgba(c, fa) : c);
+      cs.forEach((c, i) => g.addColorStop(cs.length === 1 ? 0 : i / (cs.length - 1), conv(c)));
+      return g;
+    }
+    const N = 30;
+    for (let j = 0; j <= N; j++) { const u = j / N; g.addColorStop(u, cyc(u * fSpread + phase0, fa)); }
+    return g;
   };
   /* jedna „warstwowa” sztuka tekstu: twardy cień, poświata, obrys zewnętrzny, obrys, cień, wypełnienie */
   const run = (txt, px, py, fillOver, noGrad) => {
@@ -73,14 +104,16 @@ function makeTextSprite(T, W, H, tfx) {
     if (hard > 0) { x.fillStyle = T.hardC || '#000'; x.strokeStyle = T.hardC || '#000'; x.lineWidth = lw + lw2 * 2; x.fillText(txt, px + hard, py + hard); if (x.lineWidth > 0.4) x.strokeText(txt, px + hard, py + hard); }
     if (glowA > 0.01) {
       const passes = glowA > 1.2 ? 3 : glowA > 0.6 ? 2 : 1;
-      x.shadowColor = rgba(T.glowC || '#ffffff', clamp(glowA, 0, 1)); x.shadowBlur = (T.glowB == null ? 0.5 : T.glowB) * fs * 0.9 + fs * 0.05; x.shadowOffsetX = 0; x.shadowOffsetY = 0;
-      x.fillStyle = fillOver || T.color; for (let i = 0; i < passes; i++) x.fillText(txt, px, py);
+      x.shadowColor = glowStr(clamp(glowA, 0, 1)); x.shadowBlur = (T.glowB == null ? 0.5 : T.glowB) * fs * 0.9 + fs * 0.05; x.shadowOffsetX = 0; x.shadowOffsetY = 0;
+      x.fillStyle = fillOver || T.color;
+      if (fa < 0.999 && !noGrad) { x.shadowOffsetX = 5000; for (let i = 0; i < passes; i++) x.fillText(txt, px - 5000, py); }   /* przezroczysty napis: rysujemy samą poświatę, bez pełnego wypełnienia */
+      else for (let i = 0; i < passes; i++) x.fillText(txt, px, py);
       clearShadow();
     }
     let first = true;
     const layer = (width, col) => { if (first) sh(); x.strokeStyle = col; x.lineWidth = width; x.strokeText(txt, px, py); if (first) { clearShadow(); first = false; } };
     if (lw2 > 0.4) layer(lw + lw2 * 2, rgba(T.out2C || '#000', 1));
-    if (lw > 0.4) layer(lw, strokeCol);
+    if (lw > 0.4) layer(lw, strokeStr());
     x.fillStyle = noGrad ? (fillOver || T.color) : makeFill(fillOver);
     if (first) sh();
     x.fillText(txt, px, py);
@@ -130,6 +163,26 @@ function makeTextSprite(T, W, H, tfx) {
       run(ch2, -x.measureText(ch2).width / 2, 0, fillOver, true); x.restore();
     }
   });
+  if ((fmode === 'galaxy' || fmode === 'glitter') && !per) {
+    /* tekstura kosmiczna / brokat widoczna tylko wewnątrz liter */
+    const fm = mkCanvas(w, hh), fx = fm.getContext('2d');
+    fx.font = font; fx.textBaseline = 'middle'; fx.textAlign = 'left'; fx.fillStyle = '#fff'; if (hasLS) fx.letterSpacing = (T.spacing * fs) + 'px';
+    lines.forEach((l, li) => { const lwid = mc.measureText(l).width, left = T.align === 'left' ? pad : T.align === 'right' ? w - pad - lwid : w / 2 - lwid / 2; fx.fillText(l, left, pad + lh * (li + 0.5)); });
+    const ly = mkCanvas(w, hh), lx = ly.getContext('2d'), r1 = rng(7), r2 = rng(11);
+    if (fmode === 'galaxy') {
+      for (let i = 0; i < 7; i++) {
+        const bx = r1() * w + Math.sin(ft * 0.3 + i) * w * 0.05, by = pad + r1() * (hh - pad * 2), rad = Math.max(w, hh) * (0.18 + r1() * 0.2), col = palAt(palList.length ? palList : ['#ffffff'], i / 7 + phase0 * 0.5);
+        const gr = lx.createRadialGradient(bx, by, 0, bx, by, rad); gr.addColorStop(0, rgbaA(col, 0.7)); gr.addColorStop(1, rgbaA(col, 0)); lx.fillStyle = gr; lx.fillRect(0, 0, w, hh);
+      }
+    }
+    const dens = T.spark == null ? 0.5 : T.spark, n = clamp(Math.round(dens * (fmode === 'glitter' ? 220 : 120) * (w * hh) / (420 * 130)), 6, 700), sc = T.sparkC || '#ffffff';
+    for (let i = 0; i < n; i++) {
+      const sx = r2() * w, sy = r2() * hh, sz = fs * (0.012 + r2() * 0.05), tw = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(ft * (2 + r2() * 5) + r2() * 6.28));
+      if (r2() < (fmode === 'glitter' ? 0.3 : 0.14)) starC(lx, sx, sy, sz * 2.6, tw, sc); else { lx.globalAlpha = tw * 0.9; lx.fillStyle = sc; lx.beginPath(); lx.arc(sx, sy, Math.max(0.6, sz * 0.5), 0, 7); lx.fill(); lx.globalAlpha = 1; }
+    }
+    lx.globalCompositeOperation = 'destination-in'; lx.drawImage(fm, 0, 0);
+    x.save(); x.globalAlpha = clamp(fa + 0.1, 0, 1); x.drawImage(ly, 0, 0); x.restore();
+  }
   if (blurAmt > 0.01 && HAS_FILTER) {
     const b = mkCanvas(w, hh), bx = b.getContext('2d');
     bx.filter = `blur(${(blurAmt * fs * 0.22).toFixed(1)}px)`; bx.drawImage(cv, 0, 0); cv = b;
@@ -445,6 +498,8 @@ class Renderer {
         if (!tfx && TEXT_IN_MODES.includes(ao) && lt > c.dur - dOut) tfx = { mode: ao, p: clamp((c.dur - lt) / dOut, 0, 1), t: lt };
         if (!tfx && TEXT_LOOP_MODES.includes(c.animLoop.id)) tfx = { mode: c.animLoop.id, t: Math.max(0, lt), p: 1 };
       }
+      const T0 = c.text;
+      if (['shift', 'rainbow', 'galaxy', 'glitter'].includes(T0.fillMode) || T0.glowCycle || T0.strokeCycle) { tfx = tfx || { mode: 'fill', t: Math.max(0, lt), p: 1 }; if (tfx.t == null) tfx.t = Math.max(0, lt); }
       src = this.textSprite(c, tfx); ow = src.width; oh = src.height;
     } else if (c.type === 'sticker') { src = this.stickerSprite(c); ow = src.width; oh = src.height; }
     else {
