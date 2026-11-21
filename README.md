@@ -8,16 +8,9 @@ Wszystkie efekty, przejścia, animacje, filtry i style tekstu są **własną imp
 
 ## Jak zdobyć aplikację
 
-**1. Wersja online (instalowalna PWA).** Po włączeniu GitHub Pages (Settings → Pages → Source: *GitHub Actions*) każdy push do `main` publikuje aplikację pod `https://maxioo21.github.io/fake-tt/`. W Chrome/Edge kliknij „Zainstaluj aplikację". Na telefonie z Androidem: menu przeglądarki → „Dodaj do ekranu głównego". Po instalacji działa też bez internetu.
+**1. Programy na komputer (.exe / .dmg / AppImage) – zalecane.** W repozytorium wejdź w *Actions* → *Aplikacje desktopowe* → *Run workflow*, wpisz wersję (np. `v1.0.0`) i uruchom. Po kilku minutach instalatory dla Windows, macOS i Linuksa pojawią się w zakładce *Releases* (https://github.com/maxioo21/fake-tt/releases). Instalatory nie są podpisane, więc Windows i macOS pokażą ostrzeżenie przy pierwszym uruchomieniu. Release powstaje też po wypchnięciu tagu `v*`.
 
-**2. Programy na komputer (.exe / .dmg / AppImage).** Wypchnij tag, a GitHub zbuduje instalatory i wrzuci je do zakładki *Releases*:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-Możesz też uruchomić workflow ręcznie: zakładka *Actions* → *Aplikacje desktopowe* → *Run workflow*. Gotowe pliki będą w artefaktach tego uruchomienia. Instalatory nie są podpisane, więc Windows i macOS pokażą ostrzeżenie przy pierwszym uruchomieniu.
+**2. Wersja online (instalowalna PWA).** Włącz GitHub Pages (Settings → Pages → Source: *GitHub Actions*), a potem uruchom ręcznie workflow *Wersja online (GitHub Pages)*. Aplikacja będzie pod `https://maxioo21.github.io/fake-tt/`. W Chrome/Edge kliknij „Zainstaluj aplikację", a na Androidzie: menu przeglądarki → „Dodaj do ekranu głównego".
 
 **3. Lokalnie.**
 
